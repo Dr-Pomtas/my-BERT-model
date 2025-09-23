@@ -276,7 +276,7 @@ def analyze():
                             'p_value': test_results['p_value'],
                             'ci_lower': test_results['confidence_interval'][0],
                             'ci_upper': test_results['confidence_interval'][1],
-                            'significant': test_results['p_value'] < 0.05
+                            'significant': bool(test_results['p_value'] < 0.05)
                         }
         
         # 星評価分布の計算
@@ -301,7 +301,7 @@ def analyze():
             correlation, p_value = pearsonr(uploaded_data['star_rating'], scored_data[model_col])
             
             # ブートストラップ信頼区間 (5000回)
-            ci_lower, ci_upper, _ = bootstrap_correlation_ci(
+            bootstrap_result = bootstrap_correlation_ci(
                 uploaded_data['star_rating'].tolist(), 
                 scored_data[model_col].tolist(), 
                 n_bootstrap=5000
@@ -310,9 +310,9 @@ def analyze():
             correlation_results[display_name] = {
                 'correlation': float(correlation),
                 'p_value': float(p_value),
-                'ci_lower': float(ci_lower),
-                'ci_upper': float(ci_upper),
-                'significant': p_value < 0.05
+                'ci_lower': float(bootstrap_result['ci_lower']),
+                'ci_upper': float(bootstrap_result['ci_upper']),
+                'significant': bool(p_value < 0.05)
             }
         
         sentiment_correlation_data = {
@@ -388,7 +388,11 @@ def bootstrap_correlation_ci(x_data, y_data, n_bootstrap=10000, confidence_level
     ci_lower = np.percentile(bootstrap_correlations, lower_percentile)
     ci_upper = np.percentile(bootstrap_correlations, upper_percentile)
     
-    return ci_lower, ci_upper, bootstrap_correlations
+    return {
+        'ci_lower': ci_lower,
+        'ci_upper': ci_upper,
+        'correlations': bootstrap_correlations
+    }
 
 def bootstrap_mae_difference_test(y_true, y_pred1, y_pred2, n_bootstrap=10000, confidence_level=0.95):
     """ブートストラップ法でMAE差の信頼区間を計算"""
@@ -429,9 +433,18 @@ def bootstrap_mae_difference_test(y_true, y_pred1, y_pred2, n_bootstrap=10000, c
     ci_lower = np.percentile(mae_differences, lower_percentile)
     ci_upper = np.percentile(mae_differences, upper_percentile)
     
+    # p値計算（両側検定）
+    mean_difference = original_mae1 - original_mae2
+    p_value = np.sum(np.abs(mae_differences) >= np.abs(mean_difference)) / len(mae_differences)
+    
     print(f"95%信頼区間: [{ci_lower:.4f}, {ci_upper:.4f}]")
     
-    return ci_lower, ci_upper, mae_differences
+    return {
+        'mean_difference': mean_difference,
+        'p_value': p_value,
+        'confidence_interval': [ci_lower, ci_upper],
+        'mae_differences': mae_differences
+    }
 
 @app.route('/get_charts')
 def get_charts():
@@ -455,7 +468,9 @@ def get_charts():
             y_data = hospital_stats['star_score'].tolist()
             
             # 相関係数の信頼区間を計算
-            ci_lower, ci_upper, _ = bootstrap_correlation_ci(x_data, y_data)
+            bootstrap_result = bootstrap_correlation_ci(x_data, y_data)
+            ci_lower = bootstrap_result['ci_lower']
+            ci_upper = bootstrap_result['ci_upper']
             correlation_cis.append((ci_lower, ci_upper))
             correlations.append(performance_metrics[model]['correlation'])
         
