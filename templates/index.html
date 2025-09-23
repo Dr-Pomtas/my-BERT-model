@@ -143,11 +143,11 @@
                             </div>
                         </div>
                         
-                        <!-- 相関行列 -->
+                        <!-- 星評価vs感情スコア分布 -->
                         <div class="row mb-4">
                             <div class="col-12">
-                                <h5><i class="fas fa-table me-2"></i>モデル間相関行列</h5>
-                                <div id="correlationMatrix"></div>
+                                <h5><i class="fas fa-scatter-chart me-2"></i>星評価と感情スコア分布</h5>
+                                <div id="sentimentDistributionChart"></div>
                             </div>
                         </div>
                         
@@ -156,6 +156,22 @@
                             <div class="col-12">
                                 <h5><i class="fas fa-hospital me-2"></i>病院別分析</h5>
                                 <div id="hospitalAnalysis"></div>
+                            </div>
+                        </div>
+                        
+                        <!-- 統計検定結果 -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h5><i class="fas fa-chart-line me-2"></i>星評価と感情スコア相関分析</h5>
+                                <div id="correlationResults"></div>
+                            </div>
+                        </div>
+                        
+                        <!-- モデル性能検定結果 -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h5><i class="fas fa-flask me-2"></i>モデル性能比較検定結果</h5>
+                                <div id="performanceTestResults"></div>
                             </div>
                         </div>
 
@@ -255,6 +271,6 @@
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- Custom JS -->
-    <script src="{{ url_for('static', filename='js/main_targeted.js') }}?v=20250923-4"></script>
+    <script src="{{ url_for('static', filename='js/main_targeted.js') }}?v=20250923-5"></script>
 </body>
 </html>

@@ -93,9 +93,7 @@ function showFileSelectionState(type, filename = null) {
                         <button class="btn btn-outline-primary btn-sm" onclick="resetUpload()">
                             <i class="fas fa-undo me-1"></i>別のファイルを選択
                         </button>
-                        <button class="btn btn-outline-info btn-sm" onclick="showDataPreview()">
-                            <i class="fas fa-eye me-1"></i>データプレビュー
-                        </button>
+
                     </div>
                 </div>
             </div>
@@ -111,9 +109,7 @@ function showFileSelectionState(type, filename = null) {
                         <button class="btn btn-outline-primary btn-sm" onclick="resetUpload()">
                             <i class="fas fa-undo me-1"></i>別のファイルを選択
                         </button>
-                        <button class="btn btn-outline-info btn-sm" onclick="showDataPreview()">
-                            <i class="fas fa-eye me-1"></i>データプレビュー
-                        </button>
+
                     </div>
                 </div>
             </div>
@@ -153,20 +149,7 @@ function resetUpload() {
     document.getElementById('statisticalSection').style.display = 'none';
 }
 
-function showDataPreview() {
-    if (!uploadedData) return;
-    
-    let preview = "データプレビュー (最初の5件):\\n\\n";
-    const headers = Object.keys(uploadedData[0]);
-    preview += headers.join(", ") + "\\n";
-    
-    for (let i = 0; i < Math.min(5, uploadedData.length); i++) {
-        const row = uploadedData[i];
-        preview += headers.map(h => row[h]).join(", ") + "\\n";
-    }
-    
-    alert(preview);
-}
+
 
 function handleFileSelect() {
     const fileInput = document.getElementById('fileInput');
@@ -382,13 +365,13 @@ function displayAnalysisResults(results) {
             console.error('❌ Star rating chart error:', e);
         }
         
-        // 相関行列 - レスポンシブ対応
-        console.log('📈 Displaying correlation matrix...', results.correlation_matrix);
+        // 星評価と感情スコア分布
+        console.log('📈 Displaying sentiment distribution chart...', results.sentiment_correlation);
         try {
-            displayCorrelationMatrix(results.correlation_matrix);
-            console.log('✅ Correlation matrix displayed');
+            displaySentimentDistributionChart(results.sentiment_correlation);
+            console.log('✅ Sentiment distribution chart displayed');
         } catch (e) {
-            console.error('❌ Correlation matrix error:', e);
+            console.error('❌ Sentiment distribution chart error:', e);
         }
         
         // 病院別分析
@@ -398,6 +381,28 @@ function displayAnalysisResults(results) {
             console.log('✅ Hospital analysis displayed');
         } catch (e) {
             console.error('❌ Hospital analysis error:', e);
+        }
+        
+        // 統計検定結果
+        if (results.sentiment_correlation) {
+            console.log('📊 Displaying correlation results...', results.sentiment_correlation.correlations);
+            try {
+                displayCorrelationResults(results.sentiment_correlation.correlations);
+                console.log('✅ Correlation results displayed');
+            } catch (e) {
+                console.error('❌ Correlation results error:', e);
+            }
+        }
+        
+        // モデル性能検定結果
+        if (results.model_performance_tests) {
+            console.log('🔬 Displaying performance test results...', results.model_performance_tests);
+            try {
+                displayPerformanceTestResults(results.model_performance_tests);
+                console.log('✅ Performance test results displayed');
+            } catch (e) {
+                console.error('❌ Performance test results error:', e);
+            }
         }
         
         console.log('All charts displayed successfully');
@@ -452,6 +457,34 @@ function displayStarRatingChart(starData) {
                     right: 10
                 }
             },
+
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: Math.max(...Object.values(starData)) + 2, // データの最大値+2
+                    title: {
+                        display: true,
+                        text: '口コミ数'
+                    },
+                    ticks: {
+                        font: {
+                            size: 11
+                        },
+                        stepSize: 1
+                    }
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: '星評価'
+                    },
+                    ticks: {
+                        font: {
+                            size: 11
+                        }
+                    }
+                }
+            },
             plugins: {
                 legend: {
                     display: true,
@@ -468,22 +501,15 @@ function displayStarRatingChart(starData) {
                     font: {
                         size: 14
                     }
-                }
-            },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    ticks: {
-                        font: {
-                            size: 11
-                        }
-                    }
                 },
-                x: {
-                    ticks: {
-                        font: {
-                            size: 11
-                        }
+                datalabels: {
+                    anchor: 'end',
+                    align: 'top',
+                    formatter: function(value, context) {
+                        return value;
+                    },
+                    font: {
+                        weight: 'bold'
                     }
                 }
             }
@@ -501,7 +527,7 @@ function displayModelComparisonChart(modelData) {
     }
     
     const models = Object.keys(modelData);
-    const maeScores = models.map(model => modelData[model].mae_score);
+    const maeScores = models.map(model => modelData[model].mae || 0);
     
     // 修正: チャートサイズ調整
     window.modelChart = new Chart(ctx, {
@@ -553,35 +579,45 @@ function displayModelComparisonChart(modelData) {
     });
 }
 
-function displayCorrelationMatrix(correlationData) {
-    currentCorrelationData = correlationData;
+function displaySentimentDistributionChart(sentimentData) {
+    // Plotlyを使用して散布図を作成
+    const traces = [];
     
-    const models = Object.keys(correlationData);
-    const matrix = models.map(model1 => 
-        models.map(model2 => correlationData[model1][model2])
-    );
-    
-    // 修正: Plotlyチャートのレスポンシブ設定
-    const data = [{
-        z: matrix,
-        x: models.map(m => m.replace('cl-tohoku/', '').replace('/bert-base-japanese', '')),
-        y: models.map(m => m.replace('cl-tohoku/', '').replace('/bert-base-japanese', '')),
-        type: 'heatmap',
-        colorscale: 'RdBu',
-        zmin: -1,
-        zmax: 1,
-        text: matrix.map(row => row.map(val => val.toFixed(3))),
-        texttemplate: "%{text}",
-        textfont: {"size": 12},
-        hoverongaps: false
-    }];
+    if (sentimentData && sentimentData.scatter_data) {
+        const models = Object.keys(sentimentData.scatter_data);
+        const colors = ['#ff6384', '#36a2eb', '#cc65fe'];
+        
+        models.forEach((model, index) => {
+            const data = sentimentData.scatter_data[model];
+            traces.push({
+                x: data.star_ratings,
+                y: data.sentiment_scores,
+                mode: 'markers',
+                type: 'scatter',
+                name: model.replace('Model ', ''),
+                marker: {
+                    color: colors[index % colors.length],
+                    size: 8,
+                    opacity: 0.7
+                }
+            });
+        });
+    }
     
     const layout = {
-        title: 'モデル間相関行列',
-        xaxis: { title: 'モデル' },
-        yaxis: { title: 'モデル' },
+        title: '星評価と感情スコアの分布',
+        xaxis: { 
+            title: '星評価',
+            range: [0.5, 5.5],
+            dtick: 1
+        },
+        yaxis: { 
+            title: '感情スコア',
+            zeroline: true
+        },
         autosize: true,
-        margin: { l: 80, r: 40, t: 80, b: 80 }
+        margin: { l: 80, r: 40, t: 80, b: 80 },
+        showlegend: true
     };
     
     const config = {
@@ -589,7 +625,7 @@ function displayCorrelationMatrix(correlationData) {
         displayModeBar: true
     };
     
-    Plotly.newPlot('correlationMatrix', data, layout, config);
+    Plotly.newPlot('sentimentDistributionChart', traces, layout, config);
 }
 
 /**
@@ -893,6 +929,66 @@ function exportResults() {
         console.error('❌ Export error:', error);
         alert('エクスポートエラー: ' + error.message);
     }
+}
+
+function displayCorrelationResults(correlationData) {
+    const container = document.getElementById('correlationResults');
+    if (!container) return;
+    
+    let html = '<div class="row">';
+    
+    Object.entries(correlationData).forEach(([model, data]) => {
+        const significance = data.significant ? 'text-success' : 'text-muted';
+        html += `
+            <div class="col-md-4 mb-3">
+                <div class="card">
+                    <div class="card-header">
+                        <h6 class="mb-0">${model}</h6>
+                    </div>
+                    <div class="card-body">
+                        <p><strong>相関係数:</strong> ${data.correlation.toFixed(4)}</p>
+                        <p><strong>p値:</strong> <span class="${significance}">${data.p_value.toFixed(6)}</span></p>
+                        <p><strong>95%信頼区間:</strong> [${data.ci_lower.toFixed(4)}, ${data.ci_upper.toFixed(4)}]</p>
+                        <p><strong>有意性:</strong> <span class="${significance}">${data.significant ? '有意 (p < 0.05)' : '非有意 (p ≥ 0.05)'}</span></p>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+function displayPerformanceTestResults(testData) {
+    const container = document.getElementById('performanceTestResults');
+    if (!container) return;
+    
+    let html = '<div class="row">';
+    
+    Object.entries(testData).forEach(([comparison, data]) => {
+        const [model1, model2] = comparison.split('_vs_');
+        const significance = data.significant ? 'text-danger' : 'text-success';
+        
+        html += `
+            <div class="col-md-6 mb-3">
+                <div class="card">
+                    <div class="card-header">
+                        <h6 class="mb-0">${model1} vs ${model2}</h6>
+                    </div>
+                    <div class="card-body">
+                        <p><strong>MAE差:</strong> ${data.mae_difference.toFixed(6)}</p>
+                        <p><strong>p値:</strong> <span class="${significance}">${data.p_value.toFixed(6)}</span></p>
+                        <p><strong>95%信頼区間:</strong> [${data.ci_lower.toFixed(6)}, ${data.ci_upper.toFixed(6)}]</p>
+                        <p><strong>性能差:</strong> <span class="${significance}">${data.significant ? '有意差あり' : '有意差なし'}</span></p>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    html += '</div>';
+    container.innerHTML = html;
 }
 
 function parseCSV(csvText) {

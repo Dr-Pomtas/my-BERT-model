@@ -252,26 +252,73 @@ def analyze():
                 'mae': float(mae)
             }
         
+        # モデル性能比較のブートストラップ検定 (5000回)
+        model_performance_tests = {}
+        model_names_list = list(MODELS.values())
+        
+        for i, model1 in enumerate(model_names_list):
+            for j, model2 in enumerate(model_names_list):
+                if i < j:  # 重複を避けるため
+                    col1 = f'{model1}_score'
+                    col2 = f'{model2}_score'
+                    
+                    if col1 in hospital_stats.columns and col2 in hospital_stats.columns:
+                        # MAE差のブートストラップ検定
+                        test_results = bootstrap_mae_difference_test(
+                            hospital_stats['star_score'].tolist(),
+                            hospital_stats[col1].tolist(),
+                            hospital_stats[col2].tolist(),
+                            n_bootstrap=5000
+                        )
+                        
+                        model_performance_tests[f'{model1}_vs_{model2}'] = {
+                            'mae_difference': test_results['mean_difference'],
+                            'p_value': test_results['p_value'],
+                            'ci_lower': test_results['confidence_interval'][0],
+                            'ci_upper': test_results['confidence_interval'][1],
+                            'significant': test_results['p_value'] < 0.05
+                        }
+        
         # 星評価分布の計算
         star_distribution = uploaded_data['star_rating'].value_counts().sort_index().to_dict()
         
-        # 相関行列の計算
-        correlation_matrix = {}
-        model_names = list(MODELS.values())
+        # 星評価と感情スコアの相関分析
+        sentiment_correlation_data = {}
+        scatter_data = {}
+        correlation_results = {}
         
-        for i, model1 in enumerate(model_names):
-            correlation_matrix[model1] = {}
-            for j, model2 in enumerate(model_names):
-                if i == j:
-                    correlation_matrix[model1][model2] = 1.0
-                else:
-                    col1 = f'{model1}_score'
-                    col2 = f'{model2}_score'
-                    if col1 in hospital_stats.columns and col2 in hospital_stats.columns:
-                        corr, _ = pearsonr(hospital_stats[col1], hospital_stats[col2])
-                        correlation_matrix[model1][model2] = float(corr)
-                    else:
-                        correlation_matrix[model1][model2] = 0.0
+        # 各モデルの星評価との相関を計算
+        for model_name, display_name in MODELS.items():
+            model_col = f'{display_name}_score'
+            
+            # 散布図用データ
+            scatter_data[display_name] = {
+                'star_ratings': uploaded_data['star_rating'].tolist(),
+                'sentiment_scores': scored_data[model_col].tolist()
+            }
+            
+            # 相関係数と検定
+            correlation, p_value = pearsonr(uploaded_data['star_rating'], scored_data[model_col])
+            
+            # ブートストラップ信頼区間 (5000回)
+            ci_lower, ci_upper, _ = bootstrap_correlation_ci(
+                uploaded_data['star_rating'].tolist(), 
+                scored_data[model_col].tolist(), 
+                n_bootstrap=5000
+            )
+            
+            correlation_results[display_name] = {
+                'correlation': float(correlation),
+                'p_value': float(p_value),
+                'ci_lower': float(ci_lower),
+                'ci_upper': float(ci_upper),
+                'significant': p_value < 0.05
+            }
+        
+        sentiment_correlation_data = {
+            'scatter_data': scatter_data,
+            'correlations': correlation_results
+        }
         
         # 基本統計の計算
         basic_stats = {
@@ -304,8 +351,9 @@ def analyze():
                 'basic_stats': basic_stats,
                 'model_comparison': performance_metrics,
                 'star_rating_distribution': star_distribution,
-                'correlation_matrix': correlation_matrix,
-                'hospital_analysis': hospital_analysis
+                'sentiment_correlation': sentiment_correlation_data,
+                'hospital_analysis': hospital_analysis,
+                'model_performance_tests': model_performance_tests
             }
         })
         
@@ -638,18 +686,30 @@ def export_results():
         return jsonify({'error': '分析結果がありません'}), 400
     
     try:
-        hospital_stats = analysis_results['hospital_stats']
+        # 個別レビューデータ（感情スコア付き）
+        scored_data = analysis_results['scored_data']
+        
+        # 必要な列を選択してエクスポート用データを作成
+        export_data = scored_data[['hospital_id', 'review_text', 'star_rating', 
+                                   'Model A (Koheiduck)_score', 'Model B (LLM-book)_score', 
+                                   'Model C (Mizuiro)_score']].copy()
+        
+        # 列名を分かりやすく変更
+        export_data.columns = [
+            'Hospital_ID', 'Review_Text', 'Star_Rating',
+            'Koheiduck_Sentiment_Score', 'LLMBook_Sentiment_Score', 'Mizuiro_Sentiment_Score'
+        ]
         
         # CSVファイルを作成
         output = io.StringIO()
-        hospital_stats.to_csv(output, index=False, encoding='utf-8')
+        export_data.to_csv(output, index=False, encoding='utf-8')
         output.seek(0)
         
         # レスポンス作成
         return app.response_class(
             output.getvalue(),
             mimetype='text/csv',
-            headers={"Content-disposition": "attachment; filename=analysis_results.csv"}
+            headers={"Content-disposition": "attachment; filename=veterinary_analysis_results_with_sentiment_scores.csv"}
         )
         
     except Exception as e:
