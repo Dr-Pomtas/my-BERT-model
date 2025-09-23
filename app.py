@@ -621,6 +621,48 @@ def download_sample():
     except Exception as e:
         return jsonify({'error': f'ダウンロードエラー: {str(e)}'}), 500
 
+@app.route('/load_sample_data', methods=['GET'])
+def load_sample_data():
+    """JavaScript用のサンプルデータロード（GETリクエスト）"""
+    global uploaded_data
+    
+    try:
+        sample_file_path = os.path.join(os.path.dirname(__file__), 'sample_data.csv')
+        
+        if not os.path.exists(sample_file_path):
+            return jsonify({'success': False, 'error': 'サンプルファイルが見つかりません'}), 404
+        
+        # CSVファイルを読み込み
+        df = pd.read_csv(sample_file_path, encoding='utf-8')
+        
+        # 必要な列があるかチェック
+        required_columns = ['hospital_id', 'review_text', 'star_rating']
+        if not all(col in df.columns for col in required_columns):
+            return jsonify({'success': False, 'error': f'必要な列が不足しています: {required_columns}'}), 400
+        
+        # データ型チェック
+        df['star_rating'] = pd.to_numeric(df['star_rating'], errors='coerce')
+        df = df.dropna(subset=['star_rating'])
+        df['star_rating'] = df['star_rating'].astype(int)
+        
+        # uploaded_data にセット
+        uploaded_data = df
+        
+        # JSONレスポンス用にデータを変換
+        data_for_js = df.to_dict('records')
+        
+        print(f"サンプルデータロード成功: {len(df)}件のレビュー")
+        
+        return jsonify({
+            'success': True, 
+            'data': data_for_js,
+            'message': f'サンプルデータを読み込みました（{len(df)}件のレビュー）'
+        })
+        
+    except Exception as e:
+        print(f"サンプルデータロードエラー: {str(e)}")
+        return jsonify({'success': False, 'error': f'サンプルロードエラー: {str(e)}'}), 500
+
 @app.route('/load_sample', methods=['POST'])
 def load_sample():
     """サンプルデータを直接ロード"""
