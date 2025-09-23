@@ -288,6 +288,43 @@ body {
     }
 }
 
+/* サンプルデータボタン */
+.btn-outline-success:hover {
+    background-color: #28a745;
+    border-color: #28a745;
+    color: white;
+}
+
+.btn-outline-info:hover {
+    background-color: #17a2b8;
+    border-color: #17a2b8;
+    color: white;
+}
+
+/* サンプルロード成功メッセージ */
+.sample-loaded {
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+    color: white;
+    border-radius: 8px;
+    padding: 15px;
+    margin-top: 10px;
+}
+
+.sample-loaded i {
+    font-size: 1.2rem;
+    margin-right: 10px;
+}
+
+/* アップロードエリアの成功状態 */
+.upload-area.sample-success {
+    border-color: #28a745;
+    background-color: #f8fff9;
+}
+
+.upload-area.sample-success .fa-cloud-upload-alt {
+    color: #28a745;
+}
+
 /* 統計検定結果 */
 .result-box {
     background-color: #f8f9fa;

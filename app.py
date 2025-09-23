@@ -588,5 +588,74 @@ def export_results():
     except Exception as e:
         return jsonify({'error': f'エクスポートエラー: {str(e)}'}), 500
 
+@app.route('/download_sample')
+def download_sample():
+    """サンプルデータのダウンロード"""
+    try:
+        sample_file_path = os.path.join(os.path.dirname(__file__), 'sample_data.csv')
+        
+        if not os.path.exists(sample_file_path):
+            return jsonify({'error': 'サンプルファイルが見つかりません'}), 404
+        
+        return send_file(
+            sample_file_path,
+            mimetype='text/csv',
+            as_attachment=True,
+            download_name='動物病院口コミサンプル.csv'
+        )
+        
+    except Exception as e:
+        return jsonify({'error': f'ダウンロードエラー: {str(e)}'}), 500
+
+@app.route('/load_sample', methods=['POST'])
+def load_sample():
+    """サンプルデータを直接ロード"""
+    global uploaded_data
+    
+    try:
+        sample_file_path = os.path.join(os.path.dirname(__file__), 'sample_data.csv')
+        
+        if not os.path.exists(sample_file_path):
+            return jsonify({'error': 'サンプルファイルが見つかりません'}), 400
+        
+        # CSVファイルを読み込み
+        df = pd.read_csv(sample_file_path)
+        
+        # 必要な列があるかチェック
+        required_columns = ['hospital_id', 'review_text', 'star_rating']
+        if not all(col in df.columns for col in required_columns):
+            return jsonify({'error': f'必要な列が不足しています: {required_columns}'}), 400
+        
+        # データ型チェック
+        df['star_rating'] = pd.to_numeric(df['star_rating'], errors='coerce')
+        df = df.dropna(subset=['star_rating'])
+        df['star_rating'] = df['star_rating'].astype(int)
+        
+        # 1-5の範囲チェック
+        df = df[(df['star_rating'] >= 1) & (df['star_rating'] <= 5)]
+        
+        uploaded_data = df
+        
+        # 基本統計量計算
+        total_reviews = len(df)
+        unique_hospitals = df['hospital_id'].nunique()
+        avg_star_rating = float(df['star_rating'].mean())
+        star_distribution = df['star_rating'].value_counts().sort_index().to_dict()
+        
+        print(f"サンプルデータロード: 総口コミ数={total_reviews}, 病院数={unique_hospitals}, 平均星評価={avg_star_rating:.2f}")
+        print(f"病院ID一覧: {df['hospital_id'].unique().tolist()}")
+        
+        stats = {
+            'total_reviews': total_reviews,
+            'unique_hospitals': unique_hospitals,
+            'avg_star_rating': avg_star_rating,
+            'star_distribution': star_distribution
+        }
+        
+        return jsonify({'success': True, 'stats': stats, 'sample_loaded': True})
+        
+    except Exception as e:
+        return jsonify({'error': f'サンプルロードエラー: {str(e)}'}), 500
+
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5002)
+    app.run(debug=True, host='0.0.0.0', port=5003)

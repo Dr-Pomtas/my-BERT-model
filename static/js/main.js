@@ -38,6 +38,18 @@ document.addEventListener('DOMContentLoaded', function() {
         runTestBtn.addEventListener('click', runStatisticalTest);
     }
     
+    // サンプルデータ
+    const loadSampleBtn = document.getElementById('loadSampleBtn');
+    const downloadSampleBtn = document.getElementById('downloadSampleBtn');
+    
+    if (loadSampleBtn) {
+        loadSampleBtn.addEventListener('click', loadSampleData);
+    }
+    
+    if (downloadSampleBtn) {
+        downloadSampleBtn.addEventListener('click', downloadSampleData);
+    }
+    
     // 統計検定
     statisticalTestBtn.addEventListener('click', runStatisticalTest);
     model1Select.addEventListener('change', validateTestInputs);
@@ -577,5 +589,56 @@ document.addEventListener('DOMContentLoaded', function() {
         testResults.classList.add('fade-in-result');
 
         console.log('検定結果を表示:', data);
+    }
+
+    function loadSampleData() {
+        const loadSampleBtn = document.getElementById('loadSampleBtn');
+        
+        // ボタンを無効化してローディング状態に
+        loadSampleBtn.disabled = true;
+        loadSampleBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>読み込み中...';
+        
+        fetch('/load_sample', {
+            method: 'POST',
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showAlert('サンプルデータを正常に読み込みました！', 'success');
+                displayStats(data.stats);
+                
+                // アップロードエリアを成功状態に変更
+                uploadArea.classList.add('sample-success');
+                uploadArea.innerHTML = `
+                    <div class="sample-loaded">
+                        <i class="fas fa-check-circle"></i>
+                        <strong>サンプルデータ読み込み完了</strong>
+                        <div class="mt-2">
+                            <small>動物病院口コミサンプル (${data.stats.total_reviews}件の口コミ、${data.stats.unique_hospitals}病院)</small>
+                        </div>
+                    </div>
+                `;
+                
+                // 分析ボタンを有効化
+                analyzeBtn.disabled = false;
+                
+            } else {
+                showAlert(data.error, 'error');
+            }
+        })
+        .catch(error => {
+            showAlert('サンプルデータの読み込みエラー: ' + error.message, 'error');
+        })
+        .finally(() => {
+            // ボタンを元に戻す
+            loadSampleBtn.disabled = false;
+            loadSampleBtn.innerHTML = '<i class="fas fa-download me-1"></i>サンプル使用';
+        });
+    }
+
+    function downloadSampleData() {
+        // サンプルファイルのダウンロード
+        window.location.href = '/download_sample';
+        showAlert('サンプルCSVファイルのダウンロードを開始しました。', 'info');
     }
 });

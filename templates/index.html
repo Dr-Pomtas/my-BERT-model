@@ -33,14 +33,22 @@
                                     <h5>CSVファイルをアップロード</h5>
                                     <p class="text-muted">ファイルをドラッグ&ドロップするか、クリックして選択してください</p>
                                     <input type="file" id="fileInput" accept=".csv" class="d-none">
-                                    <button class="btn btn-outline-primary" onclick="document.getElementById('fileInput').click()">
+                                    <button class="btn btn-outline-primary me-2" onclick="document.getElementById('fileInput').click()">
                                         <i class="fas fa-folder-open me-1"></i>ファイルを選択
+                                    </button>
+                                    <button class="btn btn-outline-success" id="loadSampleBtn">
+                                        <i class="fas fa-download me-1"></i>サンプル使用
                                     </button>
                                 </div>
                                 <div class="mt-2">
                                     <small class="text-muted">
                                         <strong>必要な列:</strong> hospital_id, review_text, star_rating (1-5)
                                     </small>
+                                </div>
+                                <div class="mt-2">
+                                    <button class="btn btn-sm btn-outline-info" id="downloadSampleBtn">
+                                        <i class="fas fa-file-download me-1"></i>サンプルCSVダウンロード
+                                    </button>
                                 </div>
                             </div>
                             <div class="col-md-6">
