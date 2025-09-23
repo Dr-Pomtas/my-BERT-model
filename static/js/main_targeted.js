@@ -292,6 +292,18 @@ function runAnalysis() {
                 console.log('🎨 Starting display...');
                 displayAnalysisResults(analysisResults);
                 
+                // MAE結果表示
+                if (analysisResults.mae_results) {
+                    console.log('📊 Displaying MAE results...');
+                    displayMAEResults(analysisResults.mae_results);
+                }
+                
+                // モデル推奨表示
+                if (analysisResults.model_recommendation) {
+                    console.log('🏆 Displaying model recommendation...');
+                    displayModelRecommendation(analysisResults.model_recommendation);
+                }
+                
                 // 分析結果の解釈を生成
                 setTimeout(() => {
                     generateAnalysisInterpretation(analysisResults);
@@ -933,7 +945,7 @@ function displayBasicStats(stats) {
                 <div class="card text-center">
                     <div class="card-body">
                         <h5 class="card-title">${stats.avg_rating.toFixed(2)}</h5>
-                        <p class="card-text">平均評価</p>
+                        <p class="card-text">平均星評価</p>
                     </div>
                 </div>
             </div>
@@ -963,8 +975,8 @@ function displayHospitalAnalysis(hospitalData) {
                         <h6 class="mb-0">病院 ${hospitalId}</h6>
                     </div>
                     <div class="card-body">
-                        <p><strong>レビュー数:</strong> ${data.review_count}</p>
-                        <p><strong>平均評価:</strong> ${data.avg_rating.toFixed(2)}</p>
+                        <p><strong>レビュー数:</strong> ${data.review_count}件</p>
+                        <p><strong>平均星評価:</strong> ${data.avg_star_rating ? data.avg_star_rating.toFixed(2) : data.avg_rating.toFixed(2)}点</p>
                         <p><strong>感情スコア平均:</strong> ${data.avg_sentiment.toFixed(3)}</p>
                     </div>
                 </div>
@@ -1069,6 +1081,8 @@ function generateAnalysisInterpretation(results) {
     const correlations = results.correlation_results || {};
     const performanceTests = results.performance_tests || {};
     const aggregatedData = results.aggregated_data || [];
+    const maeResults = results.mae_results || {};
+    const modelRecommendation = results.model_recommendation || {};
     
     // 基本統計の解釈
     const totalReviews = stats.total_reviews || 0;
@@ -1130,7 +1144,7 @@ function generateAnalysisInterpretation(results) {
     if (modelPerformance.length > 0) {
         modelPerformance.forEach((model, index) => {
             const rankIcon = index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉';
-            const performanceLevel = model.mae < 0.5 ? '優秀' : model.mae < 1.0 ? '良好' : model.mae < 1.5 ? '普通' : '要改善';
+            const performanceLevel = model.performance_level || (model.mae < 0.5 ? '優秀' : model.mae < 1.0 ? '良好' : model.mae < 1.5 ? '普通' : '要改善');
             
             interpretationHTML += `
                         <div class="d-flex justify-content-between align-items-center mb-2">
@@ -1224,7 +1238,7 @@ function generateAnalysisInterpretation(results) {
     
     // 推奨事項の生成
     if (modelPerformance.length > 0 && modelPerformance[0].mae < 1.0) {
-        interpretationHTML += `<li><strong>高精度分析:</strong> ${modelPerformance[0].name}は最も優秀な性能を示しており、重要な意思決定に推奨</li>`;
+        interpretationHTML += modelRecommendation.recommended_model ? \n            `<li><strong>📊 システム推奨モデル:</strong> ${modelRecommendation.recommended_model} - ${modelRecommendation.recommendation_reason}</li>` :\n            `<li><strong>高精度分析:</strong> ${modelPerformance[0].name}は最も優秀な性能を示しており、重要な意思決定に推奨</li>`;
     }
     
     if (strongestCorrelation && Math.abs(strongestCorrelation.correlation) > 0.7) {
@@ -1321,3 +1335,115 @@ document.addEventListener('DOMContentLoaded', function() {
         createDropdownMenus();
     }, 1000);
 });
+// MAE結果を表示する関数
+function displayMAEResults(maeData) {
+    const container = document.getElementById('maeResults');
+    if (!container) {
+        // コンテナが存在しない場合は作成
+        const correlationSection = document.querySelector('#correlationSection .row');
+        if (correlationSection) {
+            const maeSection = document.createElement('div');
+            maeSection.className = 'col-12 mt-4';
+            maeSection.innerHTML = `
+                <div class="card">
+                    <div class="card-header bg-warning text-dark">
+                        <h5 class="mb-0"><i class="fas fa-chart-bar me-2"></i>モデル性能評価 (MAE)</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="mb-3">各モデルの平均絶対誤差（MAE）による性能評価結果です。値が小さいほど高性能です。</p>
+                        <div id="maeResults"></div>
+                    </div>
+                </div>
+            `;
+            correlationSection.appendChild(maeSection);
+        }
+    }
+    
+    const maeContainer = document.getElementById('maeResults');
+    if (!maeContainer) return;
+    
+    let html = '<div class="row">';
+    
+    Object.entries(maeData).forEach(([model, data]) => {
+        const performanceClass = data.performance_level === '優秀' ? 'text-success' : 
+                                data.performance_level === '良好' ? 'text-info' :
+                                data.performance_level === '普通' ? 'text-warning' : 'text-danger';
+        
+        html += `
+            <div class="col-md-4 mb-3">
+                <div class="card">
+                    <div class="card-header">
+                        <h6 class="mb-0">${model}</h6>
+                    </div>
+                    <div class="card-body text-center">
+                        <h4 class="${performanceClass}">${data.mae.toFixed(4)}</h4>
+                        <p class="mb-2"><span class="badge bg-secondary">${data.performance_level}</span></p>
+                        <small class="text-muted">サンプル数: ${data.sample_size}件</small>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    html += '</div>';
+    maeContainer.innerHTML = html;
+}
+
+// モデル推奨結果を表示する関数
+function displayModelRecommendation(recommendationData) {
+    const container = document.getElementById('modelRecommendation');
+    if (!container) {
+        // コンテナが存在しない場合は作成
+        const correlationSection = document.querySelector('#correlationSection .row');
+        if (correlationSection) {
+            const recSection = document.createElement('div');
+            recSection.className = 'col-12 mt-4';
+            recSection.innerHTML = `
+                <div class="card border-success">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0"><i class="fas fa-trophy me-2"></i>推奨モデル判定</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="modelRecommendation"></div>
+                    </div>
+                </div>
+            `;
+            correlationSection.appendChild(recSection);
+        }
+    }
+    
+    const recContainer = document.getElementById('modelRecommendation');
+    if (!recContainer) return;
+    
+    let html = `
+        <div class="alert alert-success mb-4">
+            <h6><i class="fas fa-award me-2"></i>最適モデル: <strong>${recommendationData.recommended_model}</strong></h6>
+            <p class="mb-0">${recommendationData.recommendation_reason}</p>
+            <small>評価対象: ${recommendationData.sample_size}件のレビューデータ</small>
+        </div>
+        
+        <h6>性能ランキング:</h6>
+        <div class="row">
+    `;
+    
+    recommendationData.rankings.forEach((ranking, index) => {
+        const rankIcon = index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉';
+        const cardClass = index === 0 ? 'border-warning' : index === 1 ? 'border-secondary' : 'border-light';
+        
+        html += `
+            <div class="col-md-4 mb-3">
+                <div class="card ${cardClass}">
+                    <div class="card-body text-center">
+                        <div class="h4">${rankIcon}</div>
+                        <h6>${ranking.model}</h6>
+                        <p class="mb-2">MAE: <strong>${ranking.mae.toFixed(4)}</strong></p>
+                        <span class="badge bg-secondary">${ranking.performance_level}</span>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    html += '</div>';
+    recContainer.innerHTML = html;
+}

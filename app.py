@@ -329,7 +329,8 @@ def analyze():
                 'p_value': float(p_value),
                 'ci_lower': float(bootstrap_result['ci_lower']),
                 'ci_upper': float(bootstrap_result['ci_upper']),
-                'significant': bool(p_value < 0.05)
+                'significant': bool(p_value < 0.05),
+                'sample_size': len(uploaded_data)
             }
         
         sentiment_correlation_data = {
