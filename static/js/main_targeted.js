@@ -142,9 +142,16 @@ function resetUpload() {
     document.getElementById('analyzeBtn').disabled = true;
     document.getElementById('runTestBtn').disabled = true;
     
-    // 結果セクションを非表示
-    document.getElementById('analysisSection').style.display = 'none';
-    document.getElementById('statisticalSection').style.display = 'none';
+    // 結果セクションを非表示（要素の存在確認）
+    const analysisSection = document.getElementById('analysisSection');
+    const statisticalSection = document.getElementById('statisticalSection');
+    
+    if (analysisSection) {
+        analysisSection.style.display = 'none';
+    }
+    if (statisticalSection) {
+        statisticalSection.style.display = 'none';
+    }
 }
 
 

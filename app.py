@@ -167,6 +167,25 @@ def calculate_scores(data):
     
     # 論文3.1.3節 星評価スコア変換の詳細に従った計算
     # 星評価スコア = 星評価 - 3
+    # まずデータ型を確認し、必要に応じて数値型に変換
+    print(f"星評価データ型: {data['star_rating'].dtype}")
+    print(f"星評価サンプル値: {data['star_rating'].head().tolist()}")
+    
+    # 星評価を数値型に変換（文字列の場合も対応）
+    data['star_rating'] = pd.to_numeric(data['star_rating'], errors='coerce')
+    
+    # NaNや無効な値を除去
+    invalid_rows = data['star_rating'].isna()
+    if invalid_rows.any():
+        print(f"警告: {invalid_rows.sum()}件の無効な星評価を除外します")
+        data = data[~invalid_rows].copy()
+    
+    # 星評価が1-5の範囲内かチェック
+    valid_range = (data['star_rating'] >= 1) & (data['star_rating'] <= 5)
+    if not valid_range.all():
+        print(f"警告: {(~valid_range).sum()}件の範囲外星評価を除外します")
+        data = data[valid_range].copy()
+    
     # この変換により以下のスコア範囲が実現される：
     # - 星5: +2 (非常に良い)
     # - 星4: +1 (良い)  
@@ -175,6 +194,8 @@ def calculate_scores(data):
     # - 星1: -2 (非常に悪い)
     # 両スコアが[-2, +2]の同一範囲を持ち、統計的比較が可能となる
     data['star_score'] = data['star_rating'] - 3
+    
+    print(f"変換後データ数: {len(data)}件")
     
     return data
 
@@ -265,6 +286,15 @@ def analyze():
     
     # アップロードされたデータをDataFrameに変換
     uploaded_data = pd.DataFrame(request_data['data'])
+    
+    # データ型と必須カラムのチェック
+    required_columns = ['hospital_id', 'review_text', 'star_rating']
+    if not all(col in uploaded_data.columns for col in required_columns):
+        return jsonify({'error': f'必要な列が不足しています: {required_columns}'}), 400
+    
+    print(f"受信データ: {len(uploaded_data)}件")
+    print(f"星評価カラムの型: {uploaded_data['star_rating'].dtype}")
+    print(f"星評価サンプル: {uploaded_data['star_rating'].head().tolist()}")
     
     try:
         # 感情分析とスコア計算
