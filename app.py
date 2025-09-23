@@ -310,6 +310,9 @@ def analyze():
         })
         
     except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"分析エラーの詳細: {error_details}")
         return jsonify({'error': f'分析エラー: {str(e)}'}), 500
 
 def bootstrap_correlation_ci(x_data, y_data, n_bootstrap=10000, confidence_level=0.95):

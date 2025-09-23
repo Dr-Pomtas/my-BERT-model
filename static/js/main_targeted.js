@@ -265,6 +265,7 @@ function runAnalysis() {
         return;
     }
 
+    console.log('Starting analysis with data:', uploadedData.length, 'records');
     showProgressIndicator('analysis', '感情分析を実行中...');
     
     fetch('/analyze', {
@@ -276,11 +277,18 @@ function runAnalysis() {
             data: uploadedData
         })
     })
-    .then(response => response.json())
+    .then(response => {
+        console.log('Response status:', response.status);
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        return response.json();
+    })
     .then(data => {
+        console.log('Response data:', data);
         if (data.success) {
             analysisResults = data.results;
-            console.log('Analysis completed');
+            console.log('Analysis completed successfully');
             
             showProgressIndicator('chart', 'チャートを生成中...');
             
@@ -296,7 +304,8 @@ function runAnalysis() {
     })
     .catch(error => {
         showProgressIndicator('error', 'ネットワークエラー');
-        console.error('Analysis error:', error);
+        console.error('Analysis error details:', error);
+        console.error('Error type:', typeof error, error.name, error.message);
     });
 }
 
@@ -304,25 +313,42 @@ function runAnalysis() {
  * 問題2の修正: チャート表示の切れ問題
  */
 function displayAnalysisResults(results) {
-    console.log('Displaying analysis results');
+    console.log('Displaying analysis results:', results);
     
-    const analysisSection = document.getElementById('analysisSection');
-    analysisSection.style.display = 'block';
-    
-    // 基本統計の表示
-    displayBasicStats(results.basic_stats);
-    
-    // モデル比較チャート - レスポンシブ設定追加
-    displayModelComparisonChart(results.model_comparison);
-    
-    // 星評価分布チャート - サイズ調整
-    displayStarRatingChart(results.star_rating_distribution);
-    
-    // 相関行列 - レスポンシブ対応
-    displayCorrelationMatrix(results.correlation_matrix);
-    
-    // 病院別分析
-    displayHospitalAnalysis(results.hospital_analysis);
+    try {
+        const analysisSection = document.getElementById('analysisSection');
+        if (!analysisSection) {
+            console.error('analysisSection element not found');
+            return;
+        }
+        analysisSection.style.display = 'block';
+        
+        // 基本統計の表示
+        console.log('Displaying basic stats...');
+        displayBasicStats(results.basic_stats);
+        
+        // モデル比較チャート - レスポンシブ設定追加
+        console.log('Displaying model comparison...');
+        displayModelComparisonChart(results.model_comparison);
+        
+        // 星評価分布チャート - サイズ調整
+        console.log('Displaying star rating chart...');
+        displayStarRatingChart(results.star_rating_distribution);
+        
+        // 相関行列 - レスポンシブ対応
+        console.log('Displaying correlation matrix...');
+        displayCorrelationMatrix(results.correlation_matrix);
+        
+        // 病院別分析
+        console.log('Displaying hospital analysis...');
+        displayHospitalAnalysis(results.hospital_analysis);
+        
+        console.log('All charts displayed successfully');
+        
+    } catch (error) {
+        console.error('Error in displayAnalysisResults:', error);
+        showProgressIndicator('error', 'チャート表示エラー');
+    }
 }
 
 function displayStarRatingChart(starData) {

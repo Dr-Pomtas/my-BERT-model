@@ -1,0 +1,8 @@
+{
+  "data": [
+    {"hospital_id": "H001", "review_text": "とても良い病院でした", "star_rating": 5},
+    {"hospital_id": "H002", "review_text": "普通の病院です", "star_rating": 3},
+    {"hospital_id": "H003", "review_text": "悪い対応でした", "star_rating": 1},
+    {"hospital_id": "H004", "review_text": "まあまあでした", "star_rating": 4}
+  ]
+}
