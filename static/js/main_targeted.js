@@ -413,7 +413,7 @@ function displayStarRatingChart(starData) {
     if (!ctx) return;
     
     // 既存のチャートを破棄
-    if (window.starChart) {
+    if (window.starChart && typeof window.starChart.destroy === 'function') {
         window.starChart.destroy();
     }
     
@@ -496,7 +496,7 @@ function displayModelComparisonChart(modelData) {
     if (!ctx) return;
     
     // 既存のチャートを破棄
-    if (window.modelChart) {
+    if (window.modelChart && typeof window.modelChart.destroy === 'function') {
         window.modelChart.destroy();
     }
     
