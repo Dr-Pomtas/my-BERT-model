@@ -213,10 +213,15 @@ def upload_file():
 
 @app.route('/analyze', methods=['POST'])
 def analyze():
-    global uploaded_data, analysis_results
+    global analysis_results
     
-    if uploaded_data is None:
-        return jsonify({'error': 'データがアップロードされていません'}), 400
+    # リクエストからデータを取得
+    request_data = request.get_json()
+    if not request_data or 'data' not in request_data:
+        return jsonify({'error': 'データが送信されていません'}), 400
+    
+    # アップロードされたデータをDataFrameに変換
+    uploaded_data = pd.DataFrame(request_data['data'])
     
     try:
         # 感情分析とスコア計算
@@ -247,16 +252,61 @@ def analyze():
                 'mae': float(mae)
             }
         
+        # 星評価分布の計算
+        star_distribution = uploaded_data['star_rating'].value_counts().sort_index().to_dict()
+        
+        # 相関行列の計算
+        correlation_matrix = {}
+        model_names = list(MODELS.values())
+        
+        for i, model1 in enumerate(model_names):
+            correlation_matrix[model1] = {}
+            for j, model2 in enumerate(model_names):
+                if i == j:
+                    correlation_matrix[model1][model2] = 1.0
+                else:
+                    col1 = f'{model1}_score'
+                    col2 = f'{model2}_score'
+                    if col1 in hospital_stats.columns and col2 in hospital_stats.columns:
+                        corr, _ = pearsonr(hospital_stats[col1], hospital_stats[col2])
+                        correlation_matrix[model1][model2] = float(corr)
+                    else:
+                        correlation_matrix[model1][model2] = 0.0
+        
+        # 基本統計の計算
+        basic_stats = {
+            'total_reviews': len(uploaded_data),
+            'unique_hospitals': len(hospital_stats),
+            'avg_rating': float(uploaded_data['star_rating'].mean()),
+            'avg_review_length': float(uploaded_data['review_text'].str.len().mean())
+        }
+        
+        # 病院別分析データ
+        hospital_analysis = {}
+        for _, row in hospital_stats.iterrows():
+            hospital_id = row['hospital_id']
+            hospital_analysis[hospital_id] = {
+                'review_count': int(row['review_count']),
+                'avg_rating': float(uploaded_data[uploaded_data['hospital_id'] == hospital_id]['star_rating'].mean()),
+                'avg_sentiment': float(row[[col for col in hospital_stats.columns if col.endswith('_score')]].mean())
+            }
+        
         analysis_results = {
             'hospital_stats': hospital_stats,
             'performance_metrics': performance_metrics,
             'scored_data': scored_data
         }
         
+        # JavaScriptが期待する形式でレスポンスを返す
         return jsonify({
             'success': True,
-            'performance_metrics': performance_metrics,
-            'hospital_count': len(hospital_stats)
+            'results': {
+                'basic_stats': basic_stats,
+                'model_comparison': performance_metrics,
+                'star_rating_distribution': star_distribution,
+                'correlation_matrix': correlation_matrix,
+                'hospital_analysis': hospital_analysis
+            }
         })
         
     except Exception as e:
