@@ -123,13 +123,39 @@
                         <h3 class="card-title mb-0"><i class="fas fa-chart-bar me-2"></i>Step 3: 分析結果</h3>
                     </div>
                     <div class="card-body">
-                        <!-- パフォーマンス指標 -->
+                        <!-- 基本統計 -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h5><i class="fas fa-info-circle me-2"></i>基本統計</h5>
+                                <div id="basicStats"></div>
+                            </div>
+                        </div>
+                        
+                        <!-- チャート表示 -->
                         <div class="row mb-4">
                             <div class="col-md-6">
-                                <div id="correlationChart"></div>
+                                <h5><i class="fas fa-chart-bar me-2"></i>モデル性能比較</h5>
+                                <canvas id="modelChart"></canvas>
                             </div>
                             <div class="col-md-6">
-                                <div id="maeChart"></div>
+                                <h5><i class="fas fa-star me-2"></i>星評価分布</h5>
+                                <canvas id="starRatingChart"></canvas>
+                            </div>
+                        </div>
+                        
+                        <!-- 相関行列 -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h5><i class="fas fa-table me-2"></i>モデル間相関行列</h5>
+                                <div id="correlationMatrix"></div>
+                            </div>
+                        </div>
+                        
+                        <!-- 病院別分析 -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h5><i class="fas fa-hospital me-2"></i>病院別分析</h5>
+                                <div id="hospitalAnalysis"></div>
                             </div>
                         </div>
 

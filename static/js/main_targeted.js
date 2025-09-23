@@ -343,9 +343,9 @@ function displayAnalysisResults(results) {
     console.log('Displaying analysis results:', results);
     
     try {
-        const analysisSection = document.getElementById('analysisSection');
+        const analysisSection = document.getElementById('resultsSection');
         if (!analysisSection) {
-            console.error('analysisSection element not found');
+            console.error('resultsSection element not found');
             return;
         }
         analysisSection.style.display = 'block';
