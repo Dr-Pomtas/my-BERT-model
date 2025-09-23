@@ -794,8 +794,8 @@ def export_results():
         # 個別レビューデータ（感情スコア付き）
         scored_data = analysis_results['scored_data']
         
-        # 利用可能な列を確認
-        available_columns = ['hospital_id', 'review_text', 'star_rating']
+        # 利用可能な列を確認（両方の星評価を含む）
+        available_columns = ['hospital_id', 'review_text', 'star_rating', 'star_score']
         model_columns = []
         
         for model_name, display_name in MODELS.items():
@@ -809,8 +809,8 @@ def export_results():
         export_columns = available_columns + model_columns
         export_data = scored_data[export_columns].copy()
         
-        # 列名を分かりやすく変更
-        new_columns = ['Hospital_ID', 'Review_Text', 'Star_Rating']
+        # 列名を分かりやすく変更（元の星評価と変換済みスコア両方を含む）
+        new_columns = ['Hospital_ID', 'Review_Text', 'Original_Star_Rating', 'Transformed_Star_Score']
         for i, (model_name, display_name) in enumerate(MODELS.items()):
             if f'{display_name}_score' in model_columns:
                 new_columns.append(f'{display_name.replace(" ", "_").replace("(", "").replace(")", "")}_Sentiment_Score')
@@ -819,6 +819,21 @@ def export_results():
         
         # CSVファイルを作成（UTF-8 BOM付きで文字化け防止）
         output = io.StringIO()
+        
+        # ヘッダーコメントを追加（スコア変換の説明）
+        header_comments = [
+            "# 動物病院口コミ分析結果 - 変換済みスコア版",
+            "# Original_Star_Rating: 元の星評価 (1-5)",
+            "# Transformed_Star_Score: 変換済み星評価スコア (-2~+2, 論文準拠)",
+            "#   星1 → -2, 星2 → -1, 星3 → 0, 星4 → +1, 星5 → +2",
+            "# Sentiment_Score: 感情分析スコア (-2~+2, BERTモデル)",
+            "#   完全negative → -2, neutral → 0, 完全positive → +2",
+            ""
+        ]
+        
+        for comment in header_comments:
+            output.write(comment + '\n')
+        
         export_data.to_csv(output, index=False, encoding='utf-8-sig')
         output.seek(0)
         
@@ -829,7 +844,7 @@ def export_results():
             response_data.encode('utf-8-sig'),
             mimetype='text/csv; charset=utf-8-sig',
             headers={
-                "Content-disposition": "attachment; filename=veterinary_analysis_results_with_sentiment_scores.csv",
+                "Content-disposition": "attachment; filename=veterinary_analysis_results_transformed_scores.csv",
                 "Content-Type": "text/csv; charset=utf-8"
             }
         )
