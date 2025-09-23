@@ -40,14 +40,11 @@
                                         <i class="fas fa-download me-1"></i>サンプル使用
                                     </button>
                                 </div>
-                                <div class="mt-2">
-                                    <small class="text-muted">
-                                        <strong>必要な列:</strong> hospital_id, review_text, star_rating (1-5)
-                                    </small>
+                                <div class="mt-3">
+                                    <div class="alert alert-info mb-0">
+                                        <small><strong>必要な列:</strong> hospital_id, review_text, star_rating (1-5)</small>
+                                    </div>
                                 </div>
-                                <div class="mt-2">
-                                    <button class="btn btn-sm btn-outline-info" id="downloadSampleBtn">
-                                        <i class="fas fa-file-download me-1"></i>サンプルCSVダウンロード
                                     </button>
                                 </div>
                             </div>
@@ -317,6 +314,6 @@
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- Custom JS -->
-    <script src="{{ url_for('static', filename='js/main_targeted.js') }}?v=20250923-5"></script>
+    <script src="{{ url_for('static', filename='js/main_targeted.js') }}?v=20250923-6"></script>
 </body>
 </html>

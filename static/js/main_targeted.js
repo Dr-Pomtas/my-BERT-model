@@ -20,7 +20,7 @@ function initializeApp() {
     const loadSampleBtn = document.getElementById('loadSampleBtn');
     const analyzeBtn = document.getElementById('analyzeBtn');
     const runTestBtn = document.getElementById('runTestBtn');
-    const downloadSampleBtn = document.getElementById('downloadSampleBtn');
+    // const downloadSampleBtn = document.getElementById('downloadSampleBtn'); // 削除済み
     const exportBtn = document.getElementById('exportBtn');
 
     if (fileInput) {
@@ -62,9 +62,7 @@ function initializeApp() {
         runTestBtn.addEventListener('click', runStatisticalTest);
     }
 
-    if (downloadSampleBtn) {
-        downloadSampleBtn.addEventListener('click', downloadSample);
-    }
+    // ダウンロードサンプルボタンは削除済み
 
     if (exportBtn) {
         exportBtn.addEventListener('click', exportResults);
@@ -181,23 +179,33 @@ function handleFileSelect() {
 }
 
 function loadSampleData() {
+    console.log('🔄 Loading sample data...');
+    
     fetch('/load_sample_data')
-        .then(response => response.json())
+        .then(response => {
+            console.log('📡 Response status:', response.status);
+            return response.json();
+        })
         .then(data => {
+            console.log('📊 Response data:', data);
             if (data.success) {
                 uploadedData = data.data;
-                console.log('Sample data loaded:', uploadedData.length, 'records');
+                console.log('✅ Sample data loaded:', uploadedData.length, 'records');
                 
                 // 修正: サンプルデータ状態の明確な表示
                 showFileSelectionState('sample');
                 document.getElementById('analyzeBtn').disabled = false;
+                
+                // 成功メッセージ表示
+                alert(`サンプルデータを読み込みました（${uploadedData.length}件のレビュー）`);
             } else {
+                console.error('❌ Sample data loading failed:', data.error);
                 alert('サンプルデータの読み込みに失敗しました: ' + data.error);
             }
         })
         .catch(error => {
-            console.error('Sample data loading error:', error);
-            alert('サンプルデータの読み込みに失敗しました。');
+            console.error('❌ Sample data loading error:', error);
+            alert('サンプルデータの読み込みに失敗しました: ' + error.message);
         });
 }
 
@@ -988,9 +996,10 @@ function displayHospitalAnalysis(hospitalData) {
     container.innerHTML = html;
 }
 
-function downloadSample() {
-    window.location.href = '/download_sample';
-}
+// サンプルCSVダウンロード機能は削除済み
+// function downloadSample() {
+//     window.location.href = '/download_sample';
+// }
 
 function exportResults() {
     if (!analysisResults) {
