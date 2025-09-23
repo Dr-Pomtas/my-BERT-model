@@ -7,6 +7,13 @@ document.addEventListener('DOMContentLoaded', function() {
     const dataStats = document.getElementById('dataStats');
     const analysisProgress = document.getElementById('analysisProgress');
     const resultsSection = document.getElementById('resultsSection');
+    
+    // 統計検定関連の要素
+    const model1Select = document.getElementById('model1Select');
+    const model2Select = document.getElementById('model2Select');
+    const statisticalTestBtn = document.getElementById('statisticalTestBtn');
+    const testProgress = document.getElementById('testProgress');
+    const testResults = document.getElementById('testResults');
 
     let starDistributionChart = null;
 
@@ -24,6 +31,17 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // エクスポート
     exportBtn.addEventListener('click', exportResults);
+    
+    // 統計検定
+    const runTestBtn = document.getElementById('runTestBtn');
+    if (runTestBtn) {
+        runTestBtn.addEventListener('click', runStatisticalTest);
+    }
+    
+    // 統計検定
+    statisticalTestBtn.addEventListener('click', runStatisticalTest);
+    model1Select.addEventListener('change', validateTestInputs);
+    model2Select.addEventListener('change', validateTestInputs);
 
     function handleDragOver(e) {
         e.preventDefault();
@@ -246,10 +264,163 @@ document.addEventListener('DOMContentLoaded', function() {
 
             resultsSection.style.display = 'block';
             resultsSection.classList.add('fade-in');
+            
+            // 統計検定用のモデル選択肢を設定（performance_metricsを取得）
+            fetch('/get_performance_metrics')
+                .then(response => response.json())
+                .then(metricsData => {
+                    if (metricsData.success) {
+                        setupModelSelects(metricsData.performance_metrics);
+                    }
+                })
+                .catch(error => {
+                    console.log('性能指標の取得に失敗:', error);
+                });
         })
         .catch(error => {
             showAlert('チャート読み込みエラー: ' + error.message, 'error');
         });
+    }
+
+    function setupModelSelects(performanceMetrics) {
+        // モデルをMAEの昇順でソート
+        const sortedModels = Object.entries(performanceMetrics)
+            .sort((a, b) => a[1].mae - b[1].mae)
+            .map(entry => entry[0]);
+        
+        console.log('MAE順ソート結果:', sortedModels);
+        
+        // 選択肢をクリア
+        model1Select.innerHTML = '<option value="">モデルを選択...</option>';
+        model2Select.innerHTML = '<option value="">モデルを選択...</option>';
+        
+        // 全モデルを選択肢に追加
+        sortedModels.forEach(modelName => {
+            const option1 = new Option(modelName, modelName);
+            const option2 = new Option(modelName, modelName);
+            model1Select.add(option1);
+            model2Select.add(option2);
+        });
+        
+        // デフォルト設定：MAEが最も小さいモデルと2番目に小さいモデルを選択
+        if (sortedModels.length >= 2) {
+            model1Select.value = sortedModels[0]; // 最も良いモデル
+            model2Select.value = sortedModels[1]; // 2番目に良いモデル
+            validateTestInputs();
+        }
+    }
+
+    function validateTestInputs() {
+        const model1 = model1Select.value;
+        const model2 = model2Select.value;
+        
+        if (model1 && model2 && model1 !== model2) {
+            statisticalTestBtn.disabled = false;
+        } else {
+            statisticalTestBtn.disabled = true;
+        }
+    }
+
+    function runStatisticalTest() {
+        const model1 = model1Select.value;
+        const model2 = model2Select.value;
+        
+        if (!model1 || !model2 || model1 === model2) {
+            showAlert('異なる2つのモデルを選択してください', 'error');
+            return;
+        }
+        
+        // UI更新
+        statisticalTestBtn.disabled = true;
+        testProgress.classList.remove('d-none');
+        testResults.classList.add('d-none');
+        
+        // プログレスバー更新
+        updateTestProgress(0, 'ブートストラップ法による検定を開始...');
+        
+        // 検定実行
+        fetch('/statistical_test', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                model1: model1,
+                model2: model2
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                displayTestResults(data.result);
+            } else {
+                showAlert(data.error, 'error');
+            }
+        })
+        .catch(error => {
+            showAlert('統計検定エラー: ' + error.message, 'error');
+        })
+        .finally(() => {
+            statisticalTestBtn.disabled = false;
+            testProgress.classList.add('d-none');
+        });
+    }
+
+    function updateTestProgress(percent, text) {
+        document.getElementById('testProgressText').textContent = text;
+        document.getElementById('testProgressBar').style.width = percent + '%';
+    }
+
+    function displayTestResults(result) {
+        const isSignificant = result.confidence_interval[0] > 0 || result.confidence_interval[1] < 0;
+        
+        const resultHTML = `
+            <div class="test-result-item">
+                <span class="test-result-label">比較対象:</span>
+                <span class="test-result-value">${result.model1} vs ${result.model2}</span>
+            </div>
+            
+            <div class="row mt-3">
+                <div class="col-md-6">
+                    <div class="test-result-item">
+                        <span class="test-result-label">${result.model1}のMAE:</span>
+                        <span class="test-result-value">${result.mae1.toFixed(4)}</span>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="test-result-item">
+                        <span class="test-result-label">${result.model2}のMAE:</span>
+                        <span class="test-result-value">${result.mae2.toFixed(4)}</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="test-result-item mt-3">
+                <span class="test-result-label">MAEの差の95%信頼区間:</span>
+                <span class="confidence-interval">[${result.confidence_interval[0].toFixed(4)}, ${result.confidence_interval[1].toFixed(4)}]</span>
+            </div>
+            
+            <div class="conclusion ${isSignificant ? 'significant' : 'not-significant'}">
+                <i class="fas ${isSignificant ? 'fa-check-circle' : 'fa-exclamation-triangle'} me-2"></i>
+                ${isSignificant ? 
+                    '2つのモデルの性能差は、統計的に95%の信頼水準で有意です。' : 
+                    '2つのモデルの性能差は、統計的に有意であるとは言えません。'}
+            </div>
+            
+            <div class="mt-3 small text-muted">
+                <i class="fas fa-info-circle me-1"></i>
+                ブートストラップ回数: ${result.bootstrap_iterations.toLocaleString()}回
+            </div>
+        `;
+        
+        document.getElementById('testResultContent').innerHTML = resultHTML;
+        
+        // 結果ボックスのスタイリング
+        const resultBox = document.querySelector('.result-box');
+        resultBox.className = `result-box ${isSignificant ? 'significant' : 'not-significant'}`;
+        
+        testResults.classList.remove('d-none');
+        testResults.classList.add('fade-in');
     }
 
     function exportResults() {

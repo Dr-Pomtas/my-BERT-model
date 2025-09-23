@@ -262,6 +262,62 @@ def analyze():
     except Exception as e:
         return jsonify({'error': f'分析エラー: {str(e)}'}), 500
 
+def bootstrap_correlation_ci(x_data, y_data, n_bootstrap=10000, confidence_level=0.95):
+    """ブートストラップ法で相関係数の信頼区間を計算"""
+    n = len(x_data)
+    bootstrap_correlations = []
+    
+    for _ in range(n_bootstrap):
+        # リサンプリング
+        indices = np.random.choice(n, n, replace=True)
+        x_boot = [x_data[i] for i in indices]
+        y_boot = [y_data[i] for i in indices]
+        
+        # 相関係数計算
+        if len(set(x_boot)) > 1 and len(set(y_boot)) > 1:  # 分散が0でない場合のみ
+            corr, _ = pearsonr(x_boot, y_boot)
+            if not np.isnan(corr):
+                bootstrap_correlations.append(corr)
+    
+    # 信頼区間計算
+    alpha = 1 - confidence_level
+    lower_percentile = (alpha / 2) * 100
+    upper_percentile = (1 - alpha / 2) * 100
+    
+    ci_lower = np.percentile(bootstrap_correlations, lower_percentile)
+    ci_upper = np.percentile(bootstrap_correlations, upper_percentile)
+    
+    return ci_lower, ci_upper, bootstrap_correlations
+
+def bootstrap_mae_difference_test(y_true, y_pred1, y_pred2, n_bootstrap=10000, confidence_level=0.95):
+    """ブートストラップ法でMAE差の信頼区間を計算"""
+    n = len(y_true)
+    mae_differences = []
+    
+    for _ in range(n_bootstrap):
+        # リサンプリング
+        indices = np.random.choice(n, n, replace=True)
+        y_true_boot = [y_true[i] for i in indices]
+        y_pred1_boot = [y_pred1[i] for i in indices]
+        y_pred2_boot = [y_pred2[i] for i in indices]
+        
+        # MAE計算
+        mae1 = mean_absolute_error(y_true_boot, y_pred1_boot)
+        mae2 = mean_absolute_error(y_true_boot, y_pred2_boot)
+        
+        # MAE差を記録 (モデル2のMAE - モデル1のMAE)
+        mae_differences.append(mae2 - mae1)
+    
+    # 信頼区間計算
+    alpha = 1 - confidence_level
+    lower_percentile = (alpha / 2) * 100
+    upper_percentile = (1 - alpha / 2) * 100
+    
+    ci_lower = np.percentile(mae_differences, lower_percentile)
+    ci_upper = np.percentile(mae_differences, upper_percentile)
+    
+    return ci_lower, ci_upper, mae_differences
+
 @app.route('/get_charts')
 def get_charts():
     global analysis_results
@@ -273,15 +329,37 @@ def get_charts():
         hospital_stats = analysis_results['hospital_stats']
         performance_metrics = analysis_results['performance_metrics']
         
-        # 1. パフォーマンス比較棒グラフ（相関係数）
+        # 1. パフォーマンス比較棒グラフ（相関係数）- 信頼区間付き
         models = list(performance_metrics.keys())
-        correlations = [performance_metrics[model]['correlation'] for model in models]
+        correlations = []
+        correlation_cis = []
         
+        for model in models:
+            model_col = f'{model}_score'
+            x_data = hospital_stats[model_col].tolist()
+            y_data = hospital_stats['star_score'].tolist()
+            
+            # 相関係数の信頼区間を計算
+            ci_lower, ci_upper, _ = bootstrap_correlation_ci(x_data, y_data)
+            correlation_cis.append((ci_lower, ci_upper))
+            correlations.append(performance_metrics[model]['correlation'])
+        
+        # エラーバー付きの相関係数グラフ
         correlation_chart = go.Figure(data=[
-            go.Bar(x=models, y=correlations, name='相関係数')
+            go.Bar(
+                x=models, 
+                y=correlations, 
+                name='相関係数',
+                error_y=dict(
+                    type='data',
+                    symmetric=False,
+                    array=[ci[1] - corr for ci, corr in zip(correlation_cis, correlations)],
+                    arrayminus=[corr - ci[0] for ci, corr in zip(correlation_cis, correlations)]
+                )
+            )
         ])
         correlation_chart.update_layout(
-            title='モデル性能比較: 相関係数',
+            title='モデル性能比較: 相関係数 (95%信頼区間付き)',
             xaxis_title='モデル',
             yaxis_title='ピアソン相関係数',
             showlegend=False
@@ -300,12 +378,13 @@ def get_charts():
             showlegend=False
         )
         
-        # 3. 散布図（各モデル）
+        # 3. 散布図（各モデル）- 信頼区間情報付き
         scatter_charts = []
         
-        for model_name, display_name in MODELS.items():
+        for i, (model_name, display_name) in enumerate(MODELS.items()):
             model_col = f'{display_name}_score'
             correlation = performance_metrics[display_name]['correlation']
+            ci_lower, ci_upper = correlation_cis[i]
             
             # データをリストに変換して確実にプロット
             x_data = hospital_stats[model_col].tolist()
@@ -331,7 +410,6 @@ def get_charts():
             
             # 回帰線を追加
             if len(x_data) > 1:
-                from scipy import stats
                 slope, intercept, r_value, p_value, std_err = stats.linregress(x_data, y_data)
                 x_line = [min(x_data), max(x_data)]
                 y_line = [slope * x + intercept for x in x_line]
@@ -346,7 +424,7 @@ def get_charts():
                 ))
             
             scatter_chart.update_layout(
-                title=f'{display_name}<br>相関係数 r = {correlation:.3f} (病院数: {len(hospital_stats)})',
+                title=f'{display_name}<br>相関係数 r = {correlation:.3f} (95%CI: [{ci_lower:.3f}, {ci_upper:.3f}])<br>病院数: {len(hospital_stats)}',
                 xaxis_title='平均口コミスコア',
                 yaxis_title='平均星評価スコア',
                 width=400,
@@ -356,17 +434,134 @@ def get_charts():
             
             scatter_charts.append(scatter_chart)
         
+        # MAEでモデルをソートして、デフォルト選択用の情報を追加
+        mae_sorted_models = sorted(models, key=lambda m: performance_metrics[m]['mae'])
+        
         # チャートをJSONに変換
         charts_json = {
             'correlation_chart': json.dumps(correlation_chart, cls=plotly.utils.PlotlyJSONEncoder),
             'mae_chart': json.dumps(mae_chart, cls=plotly.utils.PlotlyJSONEncoder),
-            'scatter_charts': [json.dumps(chart, cls=plotly.utils.PlotlyJSONEncoder) for chart in scatter_charts]
+            'scatter_charts': [json.dumps(chart, cls=plotly.utils.PlotlyJSONEncoder) for chart in scatter_charts],
+            'model_list': models,
+            'best_model': mae_sorted_models[0] if mae_sorted_models else models[0],
+            'second_best_model': mae_sorted_models[1] if len(mae_sorted_models) > 1 else models[1] if len(models) > 1 else models[0],
+            'performance_metrics': performance_metrics,
+            'correlation_cis': {model: {'lower': ci[0], 'upper': ci[1]} for model, ci in zip(models, correlation_cis)}
         }
         
         return jsonify(charts_json)
         
     except Exception as e:
         return jsonify({'error': f'チャート生成エラー: {str(e)}'}), 500
+
+@app.route('/get_performance_metrics')
+def get_performance_metrics():
+    global analysis_results
+    
+    if analysis_results is None:
+        return jsonify({'error': '分析結果がありません'}), 400
+    
+    return jsonify({
+        'success': True,
+        'performance_metrics': analysis_results['performance_metrics']
+    })
+
+@app.route('/statistical_test', methods=['POST'])
+def statistical_test():
+    global analysis_results
+    
+    if analysis_results is None:
+        return jsonify({'error': '分析結果がありません'}), 400
+    
+    try:
+        # リクエストから比較するモデルを取得
+        data = request.get_json()
+        model1 = data.get('model1')
+        model2 = data.get('model2')
+        
+        if not model1 or not model2:
+            return jsonify({'error': 'モデルが指定されていません'}), 400
+        
+        if model1 == model2:
+            return jsonify({'error': '異なるモデルを選択してください'}), 400
+        
+        hospital_stats = analysis_results['hospital_stats']
+        
+        # モデルのカラム名を生成
+        model1_col = f'{model1}_score'
+        model2_col = f'{model2}_score'
+        
+        # カラムが存在するかチェック
+        if model1_col not in hospital_stats.columns or model2_col not in hospital_stats.columns:
+            return jsonify({'error': 'モデルデータが見つかりません'}), 400
+        
+        # データ準備
+        star_scores = hospital_stats['star_score'].values
+        model1_scores = hospital_stats[model1_col].values
+        model2_scores = hospital_stats[model2_col].values
+        
+        print(f"統計検定開始: {model1} vs {model2}")
+        print(f"データ数: {len(star_scores)}")
+        
+        # オリジナルのMAEを計算
+        mae1 = mean_absolute_error(star_scores, model1_scores)
+        mae2 = mean_absolute_error(star_scores, model2_scores)
+        
+        print(f"オリジナルMAE: {model1}={mae1:.4f}, {model2}={mae2:.4f}")
+        
+        # ブートストラップ法による検定
+        bootstrap_iterations = 10000
+        mae_differences = []
+        
+        np.random.seed(42)  # 再現可能な結果のため
+        
+        for i in range(bootstrap_iterations):
+            # ブートストラップサンプリング
+            n = len(star_scores)
+            indices = np.random.choice(n, size=n, replace=True)
+            
+            # リサンプリングされたデータでMAE計算
+            boot_star = star_scores[indices]
+            boot_model1 = model1_scores[indices]
+            boot_model2 = model2_scores[indices]
+            
+            boot_mae1 = mean_absolute_error(boot_star, boot_model1)
+            boot_mae2 = mean_absolute_error(boot_star, boot_model2)
+            
+            # MAEの差を記録
+            mae_diff = boot_mae2 - boot_mae1
+            mae_differences.append(mae_diff)
+            
+            # 進捗表示（1000回ごと）
+            if (i + 1) % 1000 == 0:
+                print(f"ブートストラップ進捗: {i + 1}/{bootstrap_iterations}")
+        
+        # 95%信頼区間を計算
+        mae_differences = np.array(mae_differences)
+        confidence_interval = [
+            float(np.percentile(mae_differences, 2.5)),
+            float(np.percentile(mae_differences, 97.5))
+        ]
+        
+        print(f"95%信頼区間: [{confidence_interval[0]:.4f}, {confidence_interval[1]:.4f}]")
+        
+        # 結果をまとめる
+        result = {
+            'model1': model1,
+            'model2': model2,
+            'mae1': float(mae1),
+            'mae2': float(mae2),
+            'mae_difference': float(mae2 - mae1),
+            'confidence_interval': confidence_interval,
+            'bootstrap_iterations': bootstrap_iterations,
+            'is_significant': confidence_interval[0] > 0 or confidence_interval[1] < 0
+        }
+        
+        return jsonify({'success': True, 'result': result})
+        
+    except Exception as e:
+        print(f"統計検定エラー: {str(e)}")
+        return jsonify({'error': f'統計検定エラー: {str(e)}'}), 500
 
 @app.route('/export_results')
 def export_results():
