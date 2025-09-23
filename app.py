@@ -726,27 +726,44 @@ def export_results():
         # 個別レビューデータ（感情スコア付き）
         scored_data = analysis_results['scored_data']
         
-        # 必要な列を選択してエクスポート用データを作成
-        export_data = scored_data[['hospital_id', 'review_text', 'star_rating', 
-                                   'Model A (Koheiduck)_score', 'Model B (LLM-book)_score', 
-                                   'Model C (Mizuiro)_score']].copy()
+        # 利用可能な列を確認
+        available_columns = ['hospital_id', 'review_text', 'star_rating']
+        model_columns = []
+        
+        for model_name, display_name in MODELS.items():
+            score_col = f'{display_name}_score'
+            if score_col in scored_data.columns:
+                model_columns.append(score_col)
+            else:
+                print(f"警告: {score_col} 列が見つかりません")
+        
+        # エクスポート用データを作成
+        export_columns = available_columns + model_columns
+        export_data = scored_data[export_columns].copy()
         
         # 列名を分かりやすく変更
-        export_data.columns = [
-            'Hospital_ID', 'Review_Text', 'Star_Rating',
-            'Koheiduck_Sentiment_Score', 'LLMBook_Sentiment_Score', 'Mizuiro_Sentiment_Score'
-        ]
+        new_columns = ['Hospital_ID', 'Review_Text', 'Star_Rating']
+        for i, (model_name, display_name) in enumerate(MODELS.items()):
+            if f'{display_name}_score' in model_columns:
+                new_columns.append(f'{display_name.replace(" ", "_").replace("(", "").replace(")", "")}_Sentiment_Score')
         
-        # CSVファイルを作成
+        export_data.columns = new_columns
+        
+        # CSVファイルを作成（UTF-8 BOM付きで文字化け防止）
         output = io.StringIO()
-        export_data.to_csv(output, index=False, encoding='utf-8')
+        export_data.to_csv(output, index=False, encoding='utf-8-sig')
         output.seek(0)
         
         # レスポンス作成
+        response_data = output.getvalue()
+        
         return app.response_class(
-            output.getvalue(),
-            mimetype='text/csv',
-            headers={"Content-disposition": "attachment; filename=veterinary_analysis_results_with_sentiment_scores.csv"}
+            response_data.encode('utf-8-sig'),
+            mimetype='text/csv; charset=utf-8-sig',
+            headers={
+                "Content-disposition": "attachment; filename=veterinary_analysis_results_with_sentiment_scores.csv",
+                "Content-Type": "text/csv; charset=utf-8"
+            }
         )
         
     except Exception as e:

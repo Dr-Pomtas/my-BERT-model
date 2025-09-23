@@ -127,6 +127,9 @@
                         <div class="row mb-4">
                             <div class="col-12">
                                 <h5><i class="fas fa-info-circle me-2"></i>基本統計</h5>
+                                <p class="text-muted mb-3">
+                                    <small><strong>目的:</strong> データセット全体の概要を把握し、分析対象となるレビューの基本的な特性（件数、病院数、平均評価、文字数）を確認します。</small>
+                                </p>
                                 <div id="basicStats"></div>
                             </div>
                         </div>
@@ -135,10 +138,16 @@
                         <div class="row mb-4">
                             <div class="col-md-6">
                                 <h5><i class="fas fa-chart-bar me-2"></i>モデル性能比較</h5>
+                                <p class="text-muted mb-3">
+                                    <small><strong>目的:</strong> 3つの日本語BERTモデルの感情分析性能をMAE（平均絶対誤差）で比較。値が低いほど実際の星評価に近い予測ができています。</small>
+                                </p>
                                 <canvas id="modelChart"></canvas>
                             </div>
                             <div class="col-md-6">
                                 <h5><i class="fas fa-star me-2"></i>星評価分布</h5>
+                                <p class="text-muted mb-3">
+                                    <small><strong>目的:</strong> データセットにおける星評価（1-5）の分布を確認し、評価のバランスやデータの偏りを把握します。</small>
+                                </p>
                                 <canvas id="starRatingChart"></canvas>
                             </div>
                         </div>
@@ -147,6 +156,9 @@
                         <div class="row mb-4">
                             <div class="col-12">
                                 <h5><i class="fas fa-scatter-chart me-2"></i>星評価と感情スコア分布</h5>
+                                <p class="text-muted mb-3">
+                                    <small><strong>目的:</strong> 各モデルの感情スコアと実際の星評価の関係を可視化。回帰直線と相関係数により、モデルが人間の評価をどの程度正確に予測できるかを評価します。星評価は-3で正規化済み。</small>
+                                </p>
                                 <div id="sentimentDistributionChart"></div>
                             </div>
                         </div>
@@ -155,6 +167,9 @@
                         <div class="row mb-4">
                             <div class="col-12">
                                 <h5><i class="fas fa-hospital me-2"></i>病院別分析</h5>
+                                <p class="text-muted mb-3">
+                                    <small><strong>目的:</strong> 各病院のレビュー数、平均星評価、感情分析による平均感情スコアを比較し、病院間の評価傾向の違いを把握します。</small>
+                                </p>
                                 <div id="hospitalAnalysis"></div>
                             </div>
                         </div>
@@ -163,6 +178,9 @@
                         <div class="row mb-4">
                             <div class="col-12">
                                 <h5><i class="fas fa-chart-line me-2"></i>星評価と感情スコア相関分析</h5>
+                                <p class="text-muted mb-3">
+                                    <small><strong>目的:</strong> 各モデルの感情スコアと星評価の相関の統計的有意性を検証。ブートストラップ法（5000回）による95%信頼区間でモデルの信頼性を評価します。</small>
+                                </p>
                                 <div id="correlationResults"></div>
                             </div>
                         </div>
@@ -171,6 +189,9 @@
                         <div class="row mb-4">
                             <div class="col-12">
                                 <h5><i class="fas fa-flask me-2"></i>モデル性能比較検定結果</h5>
+                                <p class="text-muted mb-3">
+                                    <small><strong>目的:</strong> ブートストラップ法（5000回）によりモデル間のMAE差の統計的有意性を検定。どのモデルが有意に優れた性能を示すかを科学的に判断します。</small>
+                                </p>
                                 <div id="performanceTestResults"></div>
                             </div>
                         </div>
@@ -249,11 +270,36 @@
 
 
 
+                        <!-- 分析結果総括 -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <div class="card bg-light">
+                                    <div class="card-header">
+                                        <h5><i class="fas fa-clipboard-list me-2"></i>分析結果の解釈ガイド</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <div id="analysisInterpretation">
+                                            <p class="mb-3">分析完了後、ここに詳細な結果解釈が表示されます。</p>
+                                            <ul class="list-unstyled">
+                                                <li><strong>モデル性能:</strong> MAE値による各モデルの予測精度比較</li>
+                                                <li><strong>相関分析:</strong> 星評価と感情スコアの関係性の強さ</li>
+                                                <li><strong>統計的有意性:</strong> 観察された差が偶然ではない確率</li>
+                                                <li><strong>実用性評価:</strong> 実際の業務での活用可能性</li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- エクスポート -->
                         <div class="mt-4 text-center">
                             <button id="exportBtn" class="btn btn-success btn-lg">
-                                <i class="fas fa-download me-2"></i>結果をエクスポート
+                                <i class="fas fa-download me-2"></i>詳細結果をCSVエクスポート
                             </button>
+                            <p class="text-muted mt-2">
+                                <small>各レビューの感情スコア、星評価、病院IDを含む完全なデータセット</small>
+                            </p>
                         </div>
                     </div>
                 </div>

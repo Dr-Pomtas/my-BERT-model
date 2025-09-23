@@ -291,6 +291,12 @@ function runAnalysis() {
                 // 結果表示
                 console.log('🎨 Starting display...');
                 displayAnalysisResults(analysisResults);
+                
+                // 分析結果の解釈を生成
+                setTimeout(() => {
+                    generateAnalysisInterpretation(analysisResults);
+                }, 500);
+                
                 document.getElementById('runTestBtn').disabled = false;
                 showProgressIndicator('complete', '分析完了');
                 console.log('✅ Display completed successfully');
@@ -407,6 +413,14 @@ function displayAnalysisResults(results) {
         
         console.log('All charts displayed successfully');
         
+        // 分析結果の総括解釈を生成
+        try {
+            generateAnalysisInterpretation(results);
+            console.log('✅ Analysis interpretation generated');
+        } catch (e) {
+            console.error('❌ Analysis interpretation error:', e);
+        }
+        
     } catch (error) {
         console.error('Error in displayAnalysisResults:', error);
         showProgressIndicator('error', 'チャート表示エラー');
@@ -461,7 +475,7 @@ function displayStarRatingChart(starData) {
             scales: {
                 y: {
                     beginAtZero: true,
-                    max: Math.max(...Object.values(starData)) + 2, // データの最大値+2
+                    max: Math.max(...Object.values(starData)) + 5, // データの最大値+5に変更
                     title: {
                         display: true,
                         text: '口コミ数'
@@ -583,29 +597,52 @@ function displaySentimentDistributionChart(sentimentData) {
     // Plotlyを使用して散布図を作成
     const traces = [];
     
-    if (sentimentData && sentimentData.scatter_data) {
+    if (sentimentData && sentimentData.scatter_data && sentimentData.correlations) {
         const models = Object.keys(sentimentData.scatter_data);
         const colors = ['#ff6384', '#36a2eb', '#cc65fe'];
         
         models.forEach((model, index) => {
             const data = sentimentData.scatter_data[model];
+            const correlation = sentimentData.correlations[model];
+            
+            // 散布図
             traces.push({
                 x: data.star_ratings,
                 y: data.sentiment_scores,
                 mode: 'markers',
                 type: 'scatter',
-                name: model.replace('Model ', ''),
+                name: `${model.replace('Model ', '')} (r=${correlation.correlation.toFixed(3)})`,
                 marker: {
                     color: colors[index % colors.length],
                     size: 8,
                     opacity: 0.7
                 }
             });
+            
+            // 回帰直線を計算
+            const regression = calculateRegression(data.star_ratings, data.sentiment_scores);
+            const xRange = [1, 2, 3, 4, 5];
+            const yRegression = xRange.map(x => regression.slope * x + regression.intercept);
+            
+            // 回帰直線を追加
+            traces.push({
+                x: xRange,
+                y: yRegression,
+                mode: 'lines',
+                type: 'scatter',
+                name: `回帰直線 ${model.replace('Model ', '')}`,
+                line: {
+                    color: colors[index % colors.length],
+                    width: 2,
+                    dash: 'dash'
+                },
+                showlegend: false
+            });
         });
     }
     
     const layout = {
-        title: '星評価と感情スコアの分布',
+        title: '星評価と感情スコアの分布（回帰直線付き）',
         xaxis: { 
             title: '星評価',
             range: [0.5, 5.5],
@@ -617,7 +654,18 @@ function displaySentimentDistributionChart(sentimentData) {
         },
         autosize: true,
         margin: { l: 80, r: 40, t: 80, b: 80 },
-        showlegend: true
+        showlegend: true,
+        annotations: [
+            {
+                text: '注：相関係数(r)は各モデル名の後に表示',
+                showarrow: false,
+                x: 0.02,
+                y: 0.98,
+                xref: 'paper',
+                yref: 'paper',
+                font: { size: 10 }
+            }
+        ]
     };
     
     const config = {
@@ -626,6 +674,24 @@ function displaySentimentDistributionChart(sentimentData) {
     };
     
     Plotly.newPlot('sentimentDistributionChart', traces, layout, config);
+}
+
+// 回帰直線計算のヘルパー関数
+function calculateRegression(xData, yData) {
+    const n = xData.length;
+    let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
+    
+    for (let i = 0; i < n; i++) {
+        sumX += xData[i];
+        sumY += yData[i];
+        sumXY += xData[i] * yData[i];
+        sumXX += xData[i] * xData[i];
+    }
+    
+    const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
+    const intercept = (sumY - slope * sumX) / n;
+    
+    return { slope, intercept };
 }
 
 /**
@@ -989,6 +1055,229 @@ function displayPerformanceTestResults(testData) {
     
     html += '</div>';
     container.innerHTML = html;
+}
+
+// 追加: 分析結果の包括的解釈を生成する関数
+function generateAnalysisInterpretation(results) {
+    console.log('📊 Generating analysis interpretation...');
+    
+    const container = document.getElementById('analysisInterpretation');
+    if (!container) return;
+    
+    // 統計データの取得
+    const stats = results.basic_stats || {};
+    const correlations = results.correlation_results || {};
+    const performanceTests = results.performance_tests || {};
+    const aggregatedData = results.aggregated_data || [];
+    
+    // 基本統計の解釈
+    const totalReviews = stats.total_reviews || 0;
+    const avgRating = stats.avg_rating || 0;
+    const hospitalCount = stats.unique_hospitals || 0;
+    
+    // 相関係数の取得と解釈
+    const correlationStrengths = [];
+    Object.entries(correlations).forEach(([model, data]) => {
+        const correlation = data.correlation || 0;
+        correlationStrengths.push({ model, correlation, strength: getCorrelationStrength(correlation) });
+    });
+    
+    // 最強・最弱の相関を特定
+    const strongestCorrelation = correlationStrengths.reduce((a, b) => 
+        Math.abs(a.correlation) > Math.abs(b.correlation) ? a : b
+    );
+    const weakestCorrelation = correlationStrengths.reduce((a, b) => 
+        Math.abs(a.correlation) < Math.abs(b.correlation) ? a : b
+    );
+    
+    // 性能テスト結果の解釈
+    const significantDifferences = [];
+    const nonSignificantDifferences = [];
+    
+    Object.entries(performanceTests).forEach(([comparison, data]) => {
+        if (data.significant) {
+            significantDifferences.push({ comparison, mae_diff: data.mae_difference });
+        } else {
+            nonSignificantDifferences.push({ comparison, mae_diff: data.mae_difference });
+        }
+    });
+    
+    // MAE値による性能ランキング
+    const modelPerformance = aggregatedData.length > 0 ? [
+        { name: 'Model A (Koheiduck)', mae: calculateMAE(aggregatedData, 'Model A (Koheiduck)_score', 'star_score') },
+        { name: 'Model B (LLM-book)', mae: calculateMAE(aggregatedData, 'Model B (LLM-book)_score', 'star_score') },
+        { name: 'Model C (Mizuiro)', mae: calculateMAE(aggregatedData, 'Model C (Mizuiro)_score', 'star_score') }
+    ].sort((a, b) => a.mae - b.mae) : [];
+    
+    // 解釈テキストの生成
+    let interpretationHTML = `
+        <div class="alert alert-info mb-4">
+            <h6><i class="fas fa-info-circle me-2"></i>分析概要</h6>
+            <p class="mb-2">本分析では、${hospitalCount}件の獣医病院から収集された${totalReviews}件のレビューデータを用いて、
+            3つの日本語BERT感情分析モデルの性能比較を実施しました。</p>
+            <p class="mb-0">平均評価: ${avgRating.toFixed(2)}点、分析対象期間のレビューを正規化星評価(-3〜+2)で評価しています。</p>
+        </div>
+        
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="card border-primary">
+                    <div class="card-header bg-primary text-white">
+                        <h6 class="mb-0"><i class="fas fa-trophy me-2"></i>モデル性能ランキング</h6>
+                    </div>
+                    <div class="card-body">
+    `;
+    
+    if (modelPerformance.length > 0) {
+        modelPerformance.forEach((model, index) => {
+            const rankIcon = index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉';
+            const performanceLevel = model.mae < 0.5 ? '優秀' : model.mae < 1.0 ? '良好' : model.mae < 1.5 ? '普通' : '要改善';
+            
+            interpretationHTML += `
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span>${rankIcon} ${model.name.split('(')[1]?.replace(')', '') || model.name}</span>
+                            <span class="badge bg-secondary">MAE: ${model.mae.toFixed(4)} (${performanceLevel})</span>
+                        </div>
+            `;
+        });
+    } else {
+        interpretationHTML += '<p>性能データを計算中...</p>';
+    }
+    
+    interpretationHTML += `
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card border-success">
+                    <div class="card-header bg-success text-white">
+                        <h6 class="mb-0"><i class="fas fa-link me-2"></i>相関分析結果</h6>
+                    </div>
+                    <div class="card-body">
+    `;
+    
+    if (correlationStrengths.length > 0) {
+        interpretationHTML += `
+                        <div class="mb-3">
+                            <strong>最強相関:</strong> ${strongestCorrelation.model}<br>
+                            <span class="text-primary">r = ${strongestCorrelation.correlation.toFixed(4)} (${strongestCorrelation.strength})</span>
+                        </div>
+                        <div class="mb-2">
+                            <strong>最弱相関:</strong> ${weakestCorrelation.model}<br>
+                            <span class="text-secondary">r = ${weakestCorrelation.correlation.toFixed(4)} (${weakestCorrelation.strength})</span>
+                        </div>
+        `;
+    } else {
+        interpretationHTML += '<p>相関データを計算中...</p>';
+    }
+    
+    interpretationHTML += `
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card border-warning mb-4">
+            <div class="card-header bg-warning text-dark">
+                <h6 class="mb-0"><i class="fas fa-chart-bar me-2"></i>統計的有意性検定</h6>
+            </div>
+            <div class="card-body">
+    `;
+    
+    if (significantDifferences.length > 0) {
+        interpretationHTML += `
+                <div class="alert alert-danger mb-3">
+                    <strong>有意な性能差が検出されました:</strong>
+                    <ul class="mb-0 mt-2">
+        `;
+        significantDifferences.forEach(diff => {
+            const [model1, model2] = diff.comparison.split('_vs_');
+            const betterModel = diff.mae_diff > 0 ? model2 : model1;
+            interpretationHTML += `<li>${model1} vs ${model2}: ${betterModel}が優位 (差分: ${Math.abs(diff.mae_diff).toFixed(4)})</li>`;
+        });
+        interpretationHTML += `
+                    </ul>
+                </div>
+        `;
+    }
+    
+    if (nonSignificantDifferences.length > 0) {
+        interpretationHTML += `
+                <div class="alert alert-success mb-3">
+                    <strong>統計的に有意でない比較:</strong> ${nonSignificantDifferences.length}件<br>
+                    <small>これらのモデル間では実質的な性能差は認められません。</small>
+                </div>
+        `;
+    }
+    
+    interpretationHTML += `
+            </div>
+        </div>
+        
+        <div class="card border-info">
+            <div class="card-header bg-info text-white">
+                <h6 class="mb-0"><i class="fas fa-lightbulb me-2"></i>実用性評価と推奨事項</h6>
+            </div>
+            <div class="card-body">
+                <h6>📋 推奨される活用方法:</h6>
+                <ul>
+    `;
+    
+    // 推奨事項の生成
+    if (modelPerformance.length > 0 && modelPerformance[0].mae < 1.0) {
+        interpretationHTML += `<li><strong>高精度分析:</strong> ${modelPerformance[0].name}は最も優秀な性能を示しており、重要な意思決定に推奨</li>`;
+    }
+    
+    if (strongestCorrelation && Math.abs(strongestCorrelation.correlation) > 0.7) {
+        interpretationHTML += `<li><strong>感情予測:</strong> ${strongestCorrelation.model}は星評価との強い相関を示し、顧客満足度予測に有効</li>`;
+    }
+    
+    interpretationHTML += `
+                    <li><strong>比較分析:</strong> 複数モデルの結果を組み合わせることで、より信頼性の高い分析が可能</li>
+                    <li><strong>継続監視:</strong> 定期的な分析により、サービス品質の変化を早期発見できます</li>
+                </ul>
+                
+                <h6 class="mt-4">⚠️ 注意事項:</h6>
+                <ul>
+                    <li>本分析は${totalReviews}件のサンプルに基づいており、より多くのデータで検証することを推奨</li>
+                    <li>感情分析結果は参考値として活用し、実際の業務判断には複合的な要因を考慮してください</li>
+                    <li>モデルの性能は対象ドメイン（獣医学）に特化した調整により向上する可能性があります</li>
+                </ul>
+            </div>
+        </div>
+    `;
+    
+    container.innerHTML = interpretationHTML;
+    console.log('✅ Analysis interpretation generated successfully');
+}
+
+// 相関の強さを評価する補助関数
+function getCorrelationStrength(r) {
+    const abs_r = Math.abs(r);
+    if (abs_r >= 0.8) return '非常に強い';
+    if (abs_r >= 0.6) return '強い';
+    if (abs_r >= 0.4) return '中程度';
+    if (abs_r >= 0.2) return '弱い';
+    return '非常に弱い';
+}
+
+// MAE計算の補助関数
+function calculateMAE(data, scoreColumn, targetColumn) {
+    if (!data || data.length === 0) return 0;
+    
+    let totalError = 0;
+    let count = 0;
+    
+    data.forEach(row => {
+        const predicted = parseFloat(row[scoreColumn]);
+        const actual = parseFloat(row[targetColumn]);
+        
+        if (!isNaN(predicted) && !isNaN(actual)) {
+            totalError += Math.abs(predicted - actual);
+            count++;
+        }
+    });
+    
+    return count > 0 ? totalError / count : 0;
 }
 
 function parseCSV(csvText) {
