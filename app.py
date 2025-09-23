@@ -7,6 +7,7 @@ import plotly.graph_objs as go
 import plotly.express as px
 from sklearn.metrics import mean_absolute_error
 from scipy.stats import pearsonr
+from scipy import stats
 import json
 import re
 import io
@@ -188,11 +189,19 @@ def upload_file():
             uploaded_data = df
             
             # 基本統計量計算
+            total_reviews = len(df)
+            unique_hospitals = df['hospital_id'].nunique()
+            avg_star_rating = float(df['star_rating'].mean())
+            star_distribution = df['star_rating'].value_counts().sort_index().to_dict()
+            
+            print(f"データ統計: 総口コミ数={total_reviews}, 病院数={unique_hospitals}, 平均星評価={avg_star_rating:.2f}")
+            print(f"病院ID一覧: {df['hospital_id'].unique().tolist()}")
+            
             stats = {
-                'total_reviews': len(df),
-                'unique_hospitals': df['hospital_id'].nunique(),
-                'avg_star_rating': float(df['star_rating'].mean()),
-                'star_distribution': df['star_rating'].value_counts().sort_index().to_dict()
+                'total_reviews': total_reviews,
+                'unique_hospitals': unique_hospitals,
+                'avg_star_rating': avg_star_rating,
+                'star_distribution': star_distribution
             }
             
             return jsonify({'success': True, 'stats': stats})
@@ -215,6 +224,10 @@ def analyze():
         
         # 病院単位で集計
         hospital_stats = aggregate_by_hospital(scored_data)
+        
+        print(f"集計後の病院数: {len(hospital_stats)}")
+        print(f"集計データのサンプル:")
+        print(hospital_stats.head())
         
         # モデル性能評価
         performance_metrics = {}
@@ -294,19 +307,51 @@ def get_charts():
             model_col = f'{display_name}_score'
             correlation = performance_metrics[display_name]['correlation']
             
-            scatter_chart = go.Figure(data=go.Scatter(
-                x=hospital_stats[model_col],
-                y=hospital_stats['star_score'],
+            # データをリストに変換して確実にプロット
+            x_data = hospital_stats[model_col].tolist()
+            y_data = hospital_stats['star_score'].tolist()
+            hospital_ids = hospital_stats['hospital_id'].tolist()
+            
+            scatter_chart = go.Figure()
+            
+            scatter_chart.add_trace(go.Scatter(
+                x=x_data,
+                y=y_data,
                 mode='markers',
-                marker=dict(size=8, opacity=0.6),
-                text=[f'病院ID: {hid}' for hid in hospital_stats['hospital_id']],
-                hovertemplate='<b>%{text}</b><br>口コミスコア: %{x:.2f}<br>星評価スコア: %{y:.2f}<extra></extra>'
+                marker=dict(
+                    size=10, 
+                    opacity=0.7,
+                    color='blue',
+                    line=dict(width=1, color='darkblue')
+                ),
+                text=[f'病院ID: {hid}' for hid in hospital_ids],
+                hovertemplate='<b>%{text}</b><br>口コミスコア: %{x:.3f}<br>星評価スコア: %{y:.3f}<extra></extra>',
+                name='病院データ'
             ))
             
+            # 回帰線を追加
+            if len(x_data) > 1:
+                from scipy import stats
+                slope, intercept, r_value, p_value, std_err = stats.linregress(x_data, y_data)
+                x_line = [min(x_data), max(x_data)]
+                y_line = [slope * x + intercept for x in x_line]
+                
+                scatter_chart.add_trace(go.Scatter(
+                    x=x_line,
+                    y=y_line,
+                    mode='lines',
+                    line=dict(color='red', width=2),
+                    name=f'回帰線 (r={correlation:.3f})',
+                    showlegend=True
+                ))
+            
             scatter_chart.update_layout(
-                title=f'{display_name}<br>相関係数 r = {correlation:.3f}',
+                title=f'{display_name}<br>相関係数 r = {correlation:.3f} (病院数: {len(hospital_stats)})',
                 xaxis_title='平均口コミスコア',
-                yaxis_title='平均星評価スコア'
+                yaxis_title='平均星評価スコア',
+                width=400,
+                height=400,
+                showlegend=True
             )
             
             scatter_charts.append(scatter_chart)
@@ -349,4 +394,4 @@ def export_results():
         return jsonify({'error': f'エクスポートエラー: {str(e)}'}), 500
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(debug=True, host='0.0.0.0', port=5001)

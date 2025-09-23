@@ -99,6 +99,8 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function displayStats(stats) {
+        console.log('受信した統計データ:', stats);
+        
         document.getElementById('totalReviews').textContent = stats.total_reviews.toLocaleString();
         document.getElementById('uniqueHospitals').textContent = stats.unique_hospitals.toLocaleString();
         document.getElementById('avgStarRating').textContent = stats.avg_star_rating.toFixed(2);
@@ -108,6 +110,8 @@ document.addEventListener('DOMContentLoaded', function() {
         
         dataStats.classList.remove('d-none');
         dataStats.classList.add('fade-in');
+        
+        console.log(`表示された統計: 口コミ数=${stats.total_reviews}, 病院数=${stats.unique_hospitals}`);
     }
 
     function createStarDistributionChart(distribution) {
@@ -226,6 +230,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
 
+            console.log('チャートデータを受信:', data);
+
             // チャートを描画
             Plotly.newPlot('correlationChart', JSON.parse(data.correlation_chart).data, JSON.parse(data.correlation_chart).layout, {responsive: true});
             Plotly.newPlot('maeChart', JSON.parse(data.mae_chart).data, JSON.parse(data.mae_chart).layout, {responsive: true});
@@ -234,6 +240,7 @@ document.addEventListener('DOMContentLoaded', function() {
             data.scatter_charts.forEach((chartData, index) => {
                 const chartId = `scatterChart${index + 1}`;
                 const chart = JSON.parse(chartData);
+                console.log(`散布図${index + 1}のデータ:`, chart);
                 Plotly.newPlot(chartId, chart.data, chart.layout, {responsive: true});
             });
 
