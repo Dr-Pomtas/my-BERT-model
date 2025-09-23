@@ -134,9 +134,9 @@
                         <!-- チャート表示 -->
                         <div class="row mb-4">
                             <div class="col-md-6">
-                                <h5><i class="fas fa-chart-bar me-2"></i>モデル性能比較</h5>
+                                <h5><i class="fas fa-chart-bar me-2"></i>モデル性能比較（MAE：Mean Absolute Error）</h5>
                                 <p class="text-muted mb-3">
-                                    <small><strong>目的:</strong> 3つの日本語BERTモデルの感情分析性能をMAE（平均絶対誤差）で比較。値が低いほど実際の星評価に近い予測ができています。</small>
+                                    <small><strong>目的:</strong> 3つの日本語BERTモデルの感情分析性能をMAEで比較。値が低いほど実際の星評価に近い予測ができています。</small>
                                 </p>
                                 <canvas id="modelChart"></canvas>
                             </div>
@@ -165,7 +165,7 @@
                             <div class="col-12">
                                 <h5><i class="fas fa-hospital me-2"></i>病院別分析</h5>
                                 <p class="text-muted mb-3">
-                                    <small><strong>目的:</strong> 各病院のレビュー数、平均星評価、感情分析による平均感情スコアを比較し、病院間の評価傾向の違いを把握します。</small>
+                                    <small><strong>目的:</strong> 各病院の口コミ数、平均星評価、感情分析による平均感情スコアを比較し、病院間の評価傾向の違いを把握します。</small>
                                 </p>
                                 <div id="hospitalAnalysis"></div>
                             </div>
@@ -295,7 +295,7 @@
                                 <i class="fas fa-download me-2"></i>詳細結果をCSVエクスポート
                             </button>
                             <p class="text-muted mt-2">
-                                <small>各レビューの感情スコア、星評価、病院IDを含む完全なデータセット</small>
+                                <small>各口コミの感情スコア、星評価、病院IDを含む完全なデータセット</small>
                             </p>
                         </div>
                     </div>

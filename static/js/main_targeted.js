@@ -460,15 +460,15 @@ function displayStarRatingChart(starData) {
     window.starChart = new Chart(ctx, {
         type: 'bar',
         data: {
-            labels: ['★1', '★2', '★3', '★4', '★5'],
+            labels: ['★★ (-2)', '★ (-1)', '★★★ (0)', '★★★★ (+1)', '★★★★★ (+2)'],
             datasets: [{
-                label: 'レビュー数',
+                label: '口コミ数',
                 data: [
+                    starData['-2'] || 0,
+                    starData['-1'] || 0,
+                    starData['0'] || 0,
                     starData['1'] || 0,
-                    starData['2'] || 0,
-                    starData['3'] || 0,
-                    starData['4'] || 0,
-                    starData['5'] || 0
+                    starData['2'] || 0
                 ],
                 backgroundColor: [
                     '#dc3545', '#fd7e14', '#ffc107', '#198754', '#20c997'
@@ -521,13 +521,7 @@ function displayStarRatingChart(starData) {
             },
             plugins: {
                 legend: {
-                    display: true,
-                    position: 'top',
-                    labels: {
-                        font: {
-                            size: 12
-                        }
-                    }
+                    display: false
                 },
                 title: {
                     display: true,
@@ -590,14 +584,7 @@ function displayModelComparisonChart(modelData) {
             },
             plugins: {
                 legend: {
-                    display: true
-                },
-                title: {
-                    display: true,
-                    text: 'モデル性能比較 (MAE)',
-                    font: {
-                        size: 14
-                    }
+                    display: false
                 }
             },
             scales: {
@@ -639,9 +626,9 @@ function displaySentimentDistributionChart(sentimentData) {
                 }
             });
             
-            // 回帰直線を計算
+            // 回帰直線を計算（変換済みスコア-2~+2の範囲）
             const regression = calculateRegression(data.star_ratings, data.sentiment_scores);
-            const xRange = [1, 2, 3, 4, 5];
+            const xRange = [-2, -1, 0, 1, 2];
             const yRegression = xRange.map(x => regression.slope * x + regression.intercept);
             
             // 回帰直線を追加
@@ -662,10 +649,10 @@ function displaySentimentDistributionChart(sentimentData) {
     }
     
     const layout = {
-        title: '星評価と感情スコアの分布（回帰直線付き）',
+        title: '変換済み星評価スコアと感情スコアの分布（回帰直線付き）',
         xaxis: { 
-            title: '星評価',
-            range: [0.5, 5.5],
+            title: '星評価スコア（変換済み -2~+2）',
+            range: [-2.5, 2.5],
             dtick: 1
         },
         yaxis: { 
@@ -932,36 +919,44 @@ function displayBasicStats(stats) {
     if (!statsContainer) return;
     
     statsContainer.innerHTML = `
+        <div class="alert alert-primary mb-3">
+            <h6><i class="fas fa-chart-bar me-2"></i>分析対象データ概要</h6>
+            <p class="mb-0">計 <strong>${stats.total_reviews}件の口コミ</strong> を <strong>${stats.unique_hospitals}件の動物病院</strong> から収集し、感情分析モデルの性能比較を実施</p>
+        </div>
         <div class="row">
             <div class="col-md-3">
-                <div class="card text-center">
+                <div class="card text-center border-primary">
                     <div class="card-body">
-                        <h5 class="card-title">${stats.total_reviews}</h5>
-                        <p class="card-text">総レビュー数</p>
+                        <h5 class="card-title text-primary">${stats.total_reviews}</h5>
+                        <p class="card-text"><strong>総口コミ数</strong></p>
+                        <small class="text-muted">分析サンプル</small>
                     </div>
                 </div>
             </div>
             <div class="col-md-3">
-                <div class="card text-center">
+                <div class="card text-center border-info">
                     <div class="card-body">
-                        <h5 class="card-title">${stats.unique_hospitals}</h5>
-                        <p class="card-text">病院数</p>
+                        <h5 class="card-title text-info">${stats.unique_hospitals}</h5>
+                        <p class="card-text"><strong>病院数</strong></p>
+                        <small class="text-muted">病院単位での分析</small>
                     </div>
                 </div>
             </div>
             <div class="col-md-3">
-                <div class="card text-center">
+                <div class="card text-center border-success">
                     <div class="card-body">
-                        <h5 class="card-title">${stats.avg_rating.toFixed(2)}</h5>
-                        <p class="card-text">平均星評価</p>
+                        <h5 class="card-title text-success">${stats.avg_rating.toFixed(2)}</h5>
+                        <p class="card-text"><strong>平均星評価</strong></p>
+                        <small class="text-muted">1-5点スケール</small>
                     </div>
                 </div>
             </div>
             <div class="col-md-3">
-                <div class="card text-center">
+                <div class="card text-center border-warning">
                     <div class="card-body">
-                        <h5 class="card-title">${stats.avg_review_length.toFixed(0)}</h5>
-                        <p class="card-text">平均文字数</p>
+                        <h5 class="card-title text-warning">${stats.avg_review_length.toFixed(0)}</h5>
+                        <p class="card-text"><strong>平均文字数</strong></p>
+                        <small class="text-muted">口コミあたり</small>
                     </div>
                 </div>
             </div>
@@ -973,19 +968,38 @@ function displayHospitalAnalysis(hospitalData) {
     const container = document.getElementById('hospitalAnalysis');
     if (!container) return;
     
-    let html = '<div class="row">';
+    const totalHospitals = Object.keys(hospitalData).length;
+    const totalReviews = Object.values(hospitalData).reduce((sum, data) => sum + data.review_count, 0);
+    
+    let html = `
+        <div class="alert alert-info mb-3">
+            <h6><i class="fas fa-hospital me-2"></i>病院別分析概要</h6>
+            <p class="mb-0"><strong>${totalHospitals}件の病院</strong>における計<strong>${totalReviews}件の口コミ</strong>を病院単位で集計・分析</p>
+        </div>
+        <div class="row">
+    `;
     
     Object.entries(hospitalData).forEach(([hospitalId, data]) => {
+        const ratingClass = data.avg_rating > 4 ? 'text-success' : data.avg_rating > 3 ? 'text-info' : data.avg_rating > 2 ? 'text-warning' : 'text-danger';
+        
         html += `
             <div class="col-md-6 mb-3">
                 <div class="card">
-                    <div class="card-header">
+                    <div class="card-header d-flex justify-content-between align-items-center">
                         <h6 class="mb-0">病院 ${hospitalId}</h6>
+                        <span class="badge bg-secondary">${data.review_count}件</span>
                     </div>
                     <div class="card-body">
-                        <p><strong>レビュー数:</strong> ${data.review_count}件</p>
-                        <p><strong>平均星評価:</strong> ${data.avg_star_rating ? data.avg_star_rating.toFixed(2) : data.avg_rating.toFixed(2)}点</p>
-                        <p><strong>感情スコア平均:</strong> ${data.avg_sentiment.toFixed(3)}</p>
+                        <div class="row">
+                            <div class="col-6">
+                                <p><strong>口コミ数:</strong><br><span class="text-primary">${data.review_count}件</span></p>
+                            </div>
+                            <div class="col-6">
+                                <p><strong>平均星評価:</strong><br><span class="${ratingClass}">${(data.avg_star_rating || data.avg_rating).toFixed(2)}点</span></p>
+                            </div>
+                        </div>
+                        <p><strong>感情スコア平均:</strong> <span class="text-info">${data.avg_sentiment.toFixed(3)}</span></p>
+                        <small class="text-muted">サンプル比率: ${((data.review_count / totalReviews) * 100).toFixed(1)}%</small>
                     </div>
                 </div>
             </div>
@@ -1037,6 +1051,7 @@ function displayCorrelationResults(correlationData) {
                         <p><strong>p値:</strong> <span class="${significance}">${data.p_value.toFixed(6)}</span></p>
                         <p><strong>95%信頼区間:</strong> [${data.ci_lower.toFixed(4)}, ${data.ci_upper.toFixed(4)}]</p>
                         <p><strong>有意性:</strong> <span class="${significance}">${data.significant ? '有意 (p < 0.05)' : '非有意 (p ≥ 0.05)'}</span></p>
+                        <small class="text-muted">サンプル数: ${data.sample_size}件 | ブートストラップ: ${data.bootstrap_iterations || 5000}回</small>
                     </div>
                 </div>
             </div>
@@ -1068,6 +1083,7 @@ function displayPerformanceTestResults(testData) {
                         <p><strong>p値:</strong> <span class="${significance}">${data.p_value.toFixed(6)}</span></p>
                         <p><strong>95%信頼区間:</strong> [${data.ci_lower.toFixed(6)}, ${data.ci_upper.toFixed(6)}]</p>
                         <p><strong>性能差:</strong> <span class="${significance}">${data.significant ? '有意差あり' : '有意差なし'}</span></p>
+                        <small class="text-muted">サンプル数: ${data.sample_size || 'N/A'}件 | ブートストラップ: ${data.bootstrap_iterations || 5000}回</small>
                     </div>
                 </div>
             </div>
@@ -1085,13 +1101,13 @@ function generateAnalysisInterpretation(results) {
     const container = document.getElementById('analysisInterpretation');
     if (!container) return;
     
-    // 統計データの取得
+    // 統计データの取得
     const stats = results.basic_stats || {};
-    const correlations = results.correlation_results || {};
-    const performanceTests = results.performance_tests || {};
-    const aggregatedData = results.aggregated_data || [];
-    const maeResults = results.mae_results || {};
-    const modelRecommendation = results.model_recommendation || {};
+    const correlations = results.sentiment_correlation?.correlations || {};
+    const performanceTests = results.model_performance_tests || {};
+    const modelComparison = results.model_comparison || {};
+    const hospitalAnalysis = results.hospital_analysis || {};
+    const sampleSizes = results.sample_sizes || {};
     
     // 基本統計の解釈
     const totalReviews = stats.total_reviews || 0;
@@ -1126,19 +1142,23 @@ function generateAnalysisInterpretation(results) {
     });
     
     // MAE値による性能ランキング
-    const modelPerformance = aggregatedData.length > 0 ? [
-        { name: 'Model A (Koheiduck)', mae: calculateMAE(aggregatedData, 'Model A (Koheiduck)_score', 'star_score') },
-        { name: 'Model B (LLM-book)', mae: calculateMAE(aggregatedData, 'Model B (LLM-book)_score', 'star_score') },
-        { name: 'Model C (Mizuiro)', mae: calculateMAE(aggregatedData, 'Model C (Mizuiro)_score', 'star_score') }
-    ].sort((a, b) => a.mae - b.mae) : [];
+    const modelPerformance = Object.entries(modelComparison).map(([name, data]) => ({
+        name: name,
+        mae: data.mae || 0,
+        sample_size: data.sample_size || 0
+    })).sort((a, b) => a.mae - b.mae);
     
     // 解釈テキストの生成
     let interpretationHTML = `
         <div class="alert alert-info mb-4">
             <h6><i class="fas fa-info-circle me-2"></i>分析概要</h6>
-            <p class="mb-2">本分析では、${hospitalCount}件の獣医病院から収集された${totalReviews}件のレビューデータを用いて、
+            <p class="mb-2">本分析では、<strong>${hospitalCount}件の獣医病院</strong>から収集された<strong>${totalReviews}件の口コミデータ</strong>を用いて、
             3つの日本語BERT感情分析モデルの性能比較を実施しました。</p>
-            <p class="mb-0">平均評価: ${avgRating.toFixed(2)}点、分析対象期間のレビューを正規化星評価(-3〜+2)で評価しています。</p>
+            <p class="mb-2">平均評価: ${avgRating.toFixed(2)}点、分析対象期間の口コミを正規化星評価(-3〜+2)で評価しています。</p>
+            <p class="mb-0"><small class="text-muted">
+                統計検定: ブートストラップ法${sampleSizes.bootstrap_iterations || 5000}回実施 | 
+                相関分析: ブートストラップ法${sampleSizes.correlation_bootstrap_iterations || 5000}回実施
+            </small></p>
         </div>
         
         <div class="row mb-4">
@@ -1153,12 +1173,18 @@ function generateAnalysisInterpretation(results) {
     if (modelPerformance.length > 0) {
         modelPerformance.forEach((model, index) => {
             const rankIcon = index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉';
-            const performanceLevel = model.performance_level || (model.mae < 0.5 ? '優秀' : model.mae < 1.0 ? '良好' : model.mae < 1.5 ? '普通' : '要改善');
+            const performanceLevel = model.mae < 0.5 ? '優秀' : model.mae < 1.0 ? '良好' : model.mae < 1.5 ? '普通' : '要改善';
             
             interpretationHTML += `
                         <div class="d-flex justify-content-between align-items-center mb-2">
-                            <span>${rankIcon} ${model.name.split('(')[1]?.replace(')', '') || model.name}</span>
-                            <span class="badge bg-secondary">MAE: ${model.mae.toFixed(4)} (${performanceLevel})</span>
+                            <span>${rankIcon} ${model.name.replace('Model ', '').replace('(', '').replace(')', '')}</span>
+                            <div>
+                                <span class="badge bg-secondary">MAE: ${model.mae.toFixed(4)}</span>
+                                <span class="badge bg-info ms-1">${performanceLevel}</span>
+                            </div>
+                        </div>
+                        <div class="mb-2">
+                            <small class="text-muted">サンプル数: ${model.sample_size}件</small>
                         </div>
             `;
         });
@@ -1247,7 +1273,9 @@ function generateAnalysisInterpretation(results) {
     
     // 推奨事項の生成
     if (modelPerformance.length > 0 && modelPerformance[0].mae < 1.0) {
-        interpretationHTML += modelRecommendation.recommended_model ? \n            `<li><strong>📊 システム推奨モデル:</strong> ${modelRecommendation.recommended_model} - ${modelRecommendation.recommendation_reason}</li>` :\n            `<li><strong>高精度分析:</strong> ${modelPerformance[0].name}は最も優秀な性能を示しており、重要な意思決定に推奨</li>`;
+        interpretationHTML += modelRecommendation.recommended_model ? 
+            `<li><strong>📊 システム推奨モデル:</strong> ${modelRecommendation.recommended_model} - ${modelRecommendation.recommendation_reason}</li>` :
+            `<li><strong>高精度分析:</strong> ${modelPerformance[0].name}は最も優秀な性能を示しており、重要な意思決定に推奨</li>`;
     }
     
     if (strongestCorrelation && Math.abs(strongestCorrelation.correlation) > 0.7) {
@@ -1261,7 +1289,8 @@ function generateAnalysisInterpretation(results) {
                 
                 <h6 class="mt-4">⚠️ 注意事項:</h6>
                 <ul>
-                    <li>本分析は${totalReviews}件のサンプルに基づいており、より多くのデータで検証することを推奨</li>
+                    <li>本分析は<strong>${totalReviews}件の口コミ</strong>・<strong>${hospitalCount}件の病院</strong>のサンプルに基づいており、より多くのデータで検証することを推奨</li>
+                    <li><strong>ブートストラップ統計検定</strong>: ${sampleSizes.bootstrap_iterations || 5000}回のリサンプリングにより信頼区間とp値を算出</li>
                     <li>感情分析結果は参考値として活用し、実際の業務判断には複合的な要因を考慮してください</li>
                     <li>モデルの性能は対象ドメイン（獣医学）に特化した調整により向上する可能性があります</li>
                 </ul>

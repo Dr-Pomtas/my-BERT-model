@@ -17,6 +17,7 @@ import random
 
 app = Flask(__name__)
 
+
 def convert_numpy_types(obj):
     """numpy型をPythonネイティブ型に変換"""
     if isinstance(obj, dict):
@@ -77,7 +78,7 @@ class SentimentAnalyzer:
         # テキストの前処理
         processed_text = self.preprocess_text(text)
         if not processed_text:
-            return {'positive': 0.5, 'negative': 0.5}
+            return {'positive': 0.33, 'negative': 0.33, 'neutral': 0.34}
         
         try:
             # テキストの長さとキーワードに基づいたモック感情分析
@@ -103,30 +104,38 @@ class SentimentAnalyzer:
             base_positive = 0.4 + (positive_count * 0.15) - (negative_count * 0.1) + variant
             base_negative = 0.4 + (negative_count * 0.15) - (positive_count * 0.1) - variant
             
-            # 正規化（0-1の範囲に収める）
-            total = base_positive + base_negative
-            if total > 0:
-                positive_prob = base_positive / total
-                negative_prob = base_negative / total
-            else:
-                positive_prob = 0.5
-                negative_prob = 0.5
+            # 3クラス分類（positive, negative, neutral）を想定した正規化
+            base_neutral = 0.3  # ベースラインのneutral確率
             
             # わずかなランダム性を追加（テキストハッシュベース）
             text_hash = hash(processed_text + model_name) % 1000
             noise = (text_hash / 1000 - 0.5) * 0.1
             
-            positive_prob = max(0.0, min(1.0, positive_prob + noise))
-            negative_prob = 1.0 - positive_prob
+            # 3つの感情クラスの生確率を計算
+            raw_positive = max(0.0, base_positive + noise)
+            raw_negative = max(0.0, base_negative - noise)
+            raw_neutral = base_neutral
+            
+            # 3クラスの確率の合計を1.0に正規化
+            total = raw_positive + raw_negative + raw_neutral
+            if total > 0:
+                positive_prob = raw_positive / total
+                negative_prob = raw_negative / total
+                neutral_prob = raw_neutral / total
+            else:
+                positive_prob = 0.33
+                negative_prob = 0.33
+                neutral_prob = 0.34
             
             return {
                 'positive': positive_prob,
-                'negative': negative_prob
+                'negative': negative_prob,
+                'neutral': neutral_prob
             }
             
         except Exception as e:
             print(f"感情分析エラー ({model_name}): {str(e)}")
-            return {'positive': 0.5, 'negative': 0.5}
+            return {'positive': 0.33, 'negative': 0.33, 'neutral': 0.34}
 
 # グローバルアナライザーインスタンス
 analyzer = SentimentAnalyzer()
@@ -142,7 +151,12 @@ def calculate_scores(data):
         for idx, row in data.iterrows():
             sentiment = analyzer.analyze_sentiment(row['review_text'], model_name)
             if sentiment:
-                # 口コミスコア計算: (P(pos) * 2) - (P(neg) * 2)
+                # 論文3.1.2節 口コミスコア変換の詳細に従った計算
+                # 口コミスコア = (P(positive) × 2) - (P(negative) × 2)
+                # この変換により以下のスコア範囲が実現される：
+                # - 完全positive (P(pos)=1.0, P(neg)=0.0): +2
+                # - 完全negative (P(pos)=0.0, P(neg)=1.0): -2  
+                # - neutral (P(pos)=P(neg)=低値): 0に近い値
                 review_score = (sentiment['positive'] * 2) - (sentiment['negative'] * 2)
                 model_scores.append(review_score)
             else:
@@ -151,7 +165,15 @@ def calculate_scores(data):
         data[f'{display_name}_score'] = model_scores
         print(f"モデル {display_name} の分析完了")
     
-    # 星評価スコア計算: 星評価 - 3
+    # 論文3.1.3節 星評価スコア変換の詳細に従った計算
+    # 星評価スコア = 星評価 - 3
+    # この変換により以下のスコア範囲が実現される：
+    # - 星5: +2 (非常に良い)
+    # - 星4: +1 (良い)  
+    # - 星3:  0 (中立・普通)
+    # - 星2: -1 (悪い)
+    # - 星1: -2 (非常に悪い)
+    # 両スコアが[-2, +2]の同一範囲を持ち、統計的比較が可能となる
     data['star_score'] = data['star_rating'] - 3
     
     return data
@@ -173,6 +195,10 @@ def aggregate_by_hospital(data):
 @app.route('/')
 def index():
     return render_template('index.html')
+
+@app.route('/test')
+def test():
+    return send_file('test.html')
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
@@ -266,7 +292,8 @@ def analyze():
             performance_metrics[display_name] = {
                 'correlation': float(correlation),
                 'p_value': float(p_value),
-                'mae': float(mae)
+                'mae': float(mae),
+                'sample_size': len(hospital_stats)
             }
         
         # モデル性能比較のブートストラップ検定 (5000回)
@@ -293,11 +320,13 @@ def analyze():
                             'p_value': test_results['p_value'],
                             'ci_lower': test_results['confidence_interval'][0],
                             'ci_upper': test_results['confidence_interval'][1],
-                            'significant': bool(test_results['p_value'] < 0.05)
+                            'significant': bool(test_results['p_value'] < 0.05),
+                            'sample_size': len(hospital_stats),
+                            'bootstrap_iterations': 5000
                         }
         
-        # 星評価分布の計算
-        star_distribution = uploaded_data['star_rating'].value_counts().sort_index().to_dict()
+        # 変換済み星評価スコア分布の計算（-2~+2の範囲）
+        star_distribution = scored_data['star_score'].value_counts().sort_index().to_dict()
         
         # 星評価と感情スコアの相関分析
         sentiment_correlation_data = {}
@@ -308,18 +337,18 @@ def analyze():
         for model_name, display_name in MODELS.items():
             model_col = f'{display_name}_score'
             
-            # 散布図用データ
+            # 散布図用データ（変換済みの星評価スコア-2~+2を使用）
             scatter_data[display_name] = {
-                'star_ratings': uploaded_data['star_rating'].tolist(),
+                'star_ratings': scored_data['star_score'].tolist(),
                 'sentiment_scores': scored_data[model_col].tolist()
             }
             
-            # 相関係数と検定
-            correlation, p_value = pearsonr(uploaded_data['star_rating'], scored_data[model_col])
+            # 相関係数と検定（変換済みスコア同士で計算）
+            correlation, p_value = pearsonr(scored_data['star_score'], scored_data[model_col])
             
-            # ブートストラップ信頼区間 (5000回)
+            # ブートストラップ信頼区間 (5000回)（変換済みスコア同士で計算）
             bootstrap_result = bootstrap_correlation_ci(
-                uploaded_data['star_rating'].tolist(), 
+                scored_data['star_score'].tolist(), 
                 scored_data[model_col].tolist(), 
                 n_bootstrap=5000
             )
@@ -330,7 +359,8 @@ def analyze():
                 'ci_lower': float(bootstrap_result['ci_lower']),
                 'ci_upper': float(bootstrap_result['ci_upper']),
                 'significant': bool(p_value < 0.05),
-                'sample_size': len(uploaded_data)
+                'sample_size': len(uploaded_data),
+                'bootstrap_iterations': 5000
             }
         
         sentiment_correlation_data = {
@@ -338,11 +368,11 @@ def analyze():
             'correlations': correlation_results
         }
         
-        # 基本統計の計算
+        # 基本統計の計算（変換済みスコアを使用）
         basic_stats = {
             'total_reviews': len(uploaded_data),
             'unique_hospitals': len(hospital_stats),
-            'avg_rating': float(uploaded_data['star_rating'].mean()),
+            'avg_rating': float(scored_data['star_score'].mean()),  # 変換済み星評価スコア（-2~+2）
             'avg_review_length': float(uploaded_data['review_text'].str.len().mean())
         }
         
@@ -352,7 +382,7 @@ def analyze():
             hospital_id = row['hospital_id']
             hospital_analysis[hospital_id] = {
                 'review_count': int(row['review_count']),
-                'avg_rating': float(uploaded_data[uploaded_data['hospital_id'] == hospital_id]['star_rating'].mean()),
+                'avg_rating': float(scored_data[scored_data['hospital_id'] == hospital_id]['star_score'].mean()),  # 変換済み星評価スコア
                 'avg_sentiment': float(row[[col for col in hospital_stats.columns if col.endswith('_score')]].mean())
             }
         
@@ -371,7 +401,13 @@ def analyze():
                 'star_rating_distribution': star_distribution,
                 'sentiment_correlation': sentiment_correlation_data,
                 'hospital_analysis': hospital_analysis,
-                'model_performance_tests': model_performance_tests
+                'model_performance_tests': model_performance_tests,
+                'sample_sizes': {
+                    'total_reviews': len(uploaded_data),
+                    'total_hospitals': len(hospital_stats),
+                    'bootstrap_iterations': 5000,
+                    'correlation_bootstrap_iterations': 5000
+                }
             }
         }
         
@@ -556,8 +592,8 @@ def get_charts():
                     color='blue',
                     line=dict(width=1, color='darkblue')
                 ),
-                text=[f'病院ID: {hid}' for hid in hospital_ids],
-                hovertemplate='<b>%{text}</b><br>口コミスコア: %{x:.3f}<br>星評価スコア: %{y:.3f}<extra></extra>',
+                hoverinfo='skip',
+                hovertemplate=None,
                 name='病院データ'
             ))
             
@@ -582,7 +618,8 @@ def get_charts():
                 yaxis_title='平均星評価スコア',
                 width=400,
                 height=400,
-                showlegend=True
+                showlegend=True,
+                hovermode=False
             )
             
             scatter_charts.append(scatter_chart)
@@ -882,4 +919,4 @@ def load_sample():
         return jsonify({'error': f'サンプルロードエラー: {str(e)}'}), 500
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(debug=True, host='0.0.0.0', port=5001)
