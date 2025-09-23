@@ -265,17 +265,22 @@ function runAnalysis() {
         return;
     }
 
-    console.log('Starting analysis with data:', uploadedData.length, 'records');
+    console.log('🚀 Starting analysis with data:', uploadedData.length, 'records');
+    console.log('📊 Sample data record:', uploadedData[0]);
     showProgressIndicator('analysis', '感情分析を実行中...');
+    
+    const requestBody = { data: uploadedData };
+    console.log('📡 Sending request to /analyze with body:', {
+        dataLength: uploadedData.length,
+        bodySize: JSON.stringify(requestBody).length
+    });
     
     fetch('/analyze', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-            data: uploadedData
-        })
+        body: JSON.stringify(requestBody)
     })
     .then(response => {
         console.log('Response status:', response.status);
@@ -303,9 +308,22 @@ function runAnalysis() {
         }
     })
     .catch(error => {
-        showProgressIndicator('error', 'ネットワークエラー');
-        console.error('Analysis error details:', error);
-        console.error('Error type:', typeof error, error.name, error.message);
+        console.error('❌ NETWORK/PARSE ERROR:', error);
+        console.error('❌ Error details:', {
+            type: typeof error,
+            name: error.name,
+            message: error.message,
+            stack: error.stack
+        });
+        
+        showProgressIndicator('error', 'ネットワークエラー: ' + error.message);
+        
+        // デバッグ用のアラート
+        alert('エラー詳細:\\n' +
+              'Type: ' + typeof error + '\\n' +
+              'Name: ' + error.name + '\\n' + 
+              'Message: ' + error.message + '\\n' +
+              '\\nコンソールで詳細を確認してください');
     });
 }
 
