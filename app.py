@@ -84,12 +84,18 @@ class SentimentAnalyzer:
             # テキストの長さとキーワードに基づいたモック感情分析
             text_len = len(processed_text)
             
-            # ポジティブ/ネガティブキーワード検出
-            positive_words = ['良い', 'よい', '親切', '丁寧', '安心', '素晴らしい', '優しい', '清潔', '的確', '頼り']
-            negative_words = ['悪い', 'わるい', '高い', '長い', '狭い', '不便', '不十分', '古い', '不安']
+            # ポジティブ/ネガティブキーワード検出（強い感情表現を追加）
+            positive_words = ['良い', 'よい', '親切', '丁寧', '安心', '素晴らしい', '優しい', '清潔', '的確', '頼り', 
+                            '最高', '感謝', '満足', '完璧', '最善', '迅速', '正確', '信頼', '感動', '愛情']
+            negative_words = ['悪い', 'わるい', '高い', '長い', '狭い', '不便', '不十分', '古い', '不安',
+                            '最悪', '失望', '不満', '怒り', '遅い', '雑', '不親切', '不正確', '不信', '心配']
             
             positive_count = sum(1 for word in positive_words if word in processed_text)
             negative_count = sum(1 for word in negative_words if word in processed_text)
+            
+            # 極端なケースの検出
+            very_positive = positive_count >= 3 or any(word in processed_text for word in ['最高', '完璧', '感謝', '最善'])
+            very_negative = negative_count >= 3 or any(word in processed_text for word in ['最悪', '失望', '不満', '怒り'])
             
             # モデルごとに異なる特性を持たせる
             model_variants = {
@@ -100,21 +106,29 @@ class SentimentAnalyzer:
             
             variant = model_variants.get(model_name, 0.0)
             
-            # 基本スコア計算
-            base_positive = 0.4 + (positive_count * 0.15) - (negative_count * 0.1) + variant
-            base_negative = 0.4 + (negative_count * 0.15) - (positive_count * 0.1) - variant
+            # 基本スコア計算（より広い範囲の感情スコア生成のため調整）
+            base_positive = 0.2 + (positive_count * 0.25) - (negative_count * 0.2) + variant
+            base_negative = 0.2 + (negative_count * 0.25) - (positive_count * 0.2) - variant
+            
+            # 極端なケースの特別処理（-2~+2の範囲を活用）
+            if very_positive:
+                base_positive = 0.8 + variant  # 非常にポジティブ
+                base_negative = 0.05
+            elif very_negative:
+                base_positive = 0.05  
+                base_negative = 0.8 - variant  # 非常にネガティブ
             
             # 3クラス分類（positive, negative, neutral）を想定した正規化
-            base_neutral = 0.3  # ベースラインのneutral確率
+            base_neutral = 0.15  # ベースラインのneutral確率（より低く設定）
             
-            # わずかなランダム性を追加（テキストハッシュベース）
+            # テキストハッシュベースのランダム性（より大きな変動）
             text_hash = hash(processed_text + model_name) % 1000
-            noise = (text_hash / 1000 - 0.5) * 0.1
+            noise = (text_hash / 1000 - 0.5) * 0.2  # ノイズを倍増
             
-            # 3つの感情クラスの生確率を計算
-            raw_positive = max(0.0, base_positive + noise)
-            raw_negative = max(0.0, base_negative - noise)
-            raw_neutral = base_neutral
+            # 3つの感情クラスの生確率を計算（より極端な値を許可）
+            raw_positive = max(0.0, min(1.0, base_positive + noise))
+            raw_negative = max(0.0, min(1.0, base_negative - noise))  
+            raw_neutral = max(0.1, base_neutral)  # 最小値を保持
             
             # 3クラスの確率の合計を1.0に正規化
             total = raw_positive + raw_negative + raw_neutral
@@ -158,12 +172,25 @@ def calculate_scores(data):
                 # - 完全negative (P(pos)=0.0, P(neg)=1.0): -2  
                 # - neutral (P(pos)=P(neg)=低値): 0に近い値
                 review_score = (sentiment['positive'] * 2) - (sentiment['negative'] * 2)
+                
+                # スコア範囲の確認（-2~+2の範囲内に調整）
+                review_score = max(-2.0, min(2.0, review_score))
                 model_scores.append(review_score)
             else:
                 model_scores.append(0.0)
         
         data[f'{display_name}_score'] = model_scores
+        
+        # スコア分布の確認
+        score_stats = {
+            'min': min(model_scores),
+            'max': max(model_scores), 
+            'mean': sum(model_scores) / len(model_scores),
+            'in_range_count': sum(1 for s in model_scores if -2 <= s <= 2)
+        }
         print(f"モデル {display_name} の分析完了")
+        print(f"  スコア範囲: [{score_stats['min']:.3f}, {score_stats['max']:.3f}]")
+        print(f"  平均: {score_stats['mean']:.3f}, 範囲内件数: {score_stats['in_range_count']}/{len(model_scores)}")
     
     # 論文3.1.3節 星評価スコア変換の詳細に従った計算
     # 星評価スコア = 星評価 - 3
