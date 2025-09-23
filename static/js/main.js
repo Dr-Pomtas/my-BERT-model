@@ -262,20 +262,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 Plotly.newPlot(chartId, chart.data, chart.layout, {responsive: true});
             });
 
+            // 統計検定用のUIを設定
+            setupStatisticalTestUI(data);
+
             resultsSection.style.display = 'block';
             resultsSection.classList.add('fade-in');
-            
-            // 統計検定用のモデル選択肢を設定（performance_metricsを取得）
-            fetch('/get_performance_metrics')
-                .then(response => response.json())
-                .then(metricsData => {
-                    if (metricsData.success) {
-                        setupModelSelects(metricsData.performance_metrics);
-                    }
-                })
-                .catch(error => {
-                    console.log('性能指標の取得に失敗:', error);
-                });
         })
         .catch(error => {
             showAlert('チャート読み込みエラー: ' + error.message, 'error');
@@ -462,5 +453,129 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }, 5000);
         }
+    }
+
+    function setupStatisticalTestUI(data) {
+        const model1Select = document.getElementById('model1Select');
+        const model2Select = document.getElementById('model2Select');
+        
+        if (!model1Select || !model2Select) return;
+
+        // ドロップダウンをクリア
+        model1Select.innerHTML = '<option value="">選択してください</option>';
+        model2Select.innerHTML = '<option value="">選択してください</option>';
+
+        // モデルリストを追加
+        data.model_list.forEach(model => {
+            const option1 = new Option(model, model);
+            const option2 = new Option(model, model);
+            model1Select.appendChild(option1);
+            model2Select.appendChild(option2);
+        });
+
+        // デフォルト選択（MAEが最も小さいモデルと2番目に小さいモデル）
+        if (data.best_model) {
+            model1Select.value = data.best_model;
+        }
+        if (data.second_best_model) {
+            model2Select.value = data.second_best_model;
+        }
+
+        console.log(`デフォルト設定: モデル1=${data.best_model}, モデル2=${data.second_best_model}`);
+    }
+
+    function runStatisticalTest() {
+        const model1Select = document.getElementById('model1Select');
+        const model2Select = document.getElementById('model2Select');
+        const testProgress = document.getElementById('testProgress');
+        const testResults = document.getElementById('testResults');
+        const runTestBtn = document.getElementById('runTestBtn');
+
+        const model1 = model1Select.value;
+        const model2 = model2Select.value;
+
+        if (!model1 || !model2) {
+            showAlert('両方のモデルを選択してください。', 'error');
+            return;
+        }
+
+        if (model1 === model2) {
+            showAlert('異なるモデルを選択してください。', 'error');
+            return;
+        }
+
+        // UI状態更新
+        runTestBtn.disabled = true;
+        testProgress.classList.remove('d-none');
+        testResults.classList.add('d-none');
+
+        // 検定実行
+        fetch('/statistical_test', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                model1: model1,
+                model2: model2
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                showAlert(data.error, 'error');
+                return;
+            }
+
+            displayTestResults(data);
+        })
+        .catch(error => {
+            showAlert('統計検定エラー: ' + error.message, 'error');
+        })
+        .finally(() => {
+            runTestBtn.disabled = false;
+            testProgress.classList.add('d-none');
+        });
+    }
+
+    function displayTestResults(data) {
+        const testResults = document.getElementById('testResults');
+        const comparisonModels = document.getElementById('comparisonModels');
+        const maeResults = document.getElementById('maeResults');
+        const confidenceInterval = document.getElementById('confidenceInterval');
+        const significanceResult = document.getElementById('significanceResult');
+
+        // 結果表示
+        comparisonModels.textContent = `${data.model1} vs ${data.model2}`;
+        
+        maeResults.innerHTML = `
+            ${data.model1}: ${data.mae1.toFixed(4)}<br>
+            ${data.model2}: ${data.mae2.toFixed(4)}<br>
+            MAE差: ${data.mae_difference.toFixed(4)}
+        `;
+
+        confidenceInterval.textContent = `[${data.ci_lower.toFixed(4)}, ${data.ci_upper.toFixed(4)}]`;
+
+        // 有意性の判定と表示
+        if (data.is_significant) {
+            significanceResult.innerHTML = `
+                <div class="significance-significant">
+                    <i class="fas fa-check-circle me-2"></i>
+                    2つのモデルの性能差は、統計的に95%の信頼水準で有意です。
+                </div>
+            `;
+        } else {
+            significanceResult.innerHTML = `
+                <div class="significance-not-significant">
+                    <i class="fas fa-times-circle me-2"></i>
+                    2つのモデルの性能差は、統計的に有意であるとは言えません。
+                </div>
+            `;
+        }
+
+        testResults.classList.remove('d-none');
+        testResults.classList.add('fade-in-result');
+
+        console.log('検定結果を表示:', data);
     }
 });
