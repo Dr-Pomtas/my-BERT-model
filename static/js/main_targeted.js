@@ -21,6 +21,7 @@ function initializeApp() {
     const analyzeBtn = document.getElementById('analyzeBtn');
     const runTestBtn = document.getElementById('runTestBtn');
     const downloadSampleBtn = document.getElementById('downloadSampleBtn');
+    const exportBtn = document.getElementById('exportBtn');
 
     if (fileInput) {
         fileInput.addEventListener('change', handleFileSelect);
@@ -63,6 +64,10 @@ function initializeApp() {
 
     if (downloadSampleBtn) {
         downloadSampleBtn.addEventListener('click', downloadSample);
+    }
+
+    if (exportBtn) {
+        exportBtn.addEventListener('click', exportResults);
     }
 
     // 初期状態の設定
@@ -351,24 +356,49 @@ function displayAnalysisResults(results) {
         analysisSection.style.display = 'block';
         
         // 基本統計の表示
-        console.log('Displaying basic stats...');
-        displayBasicStats(results.basic_stats);
+        console.log('📊 Displaying basic stats...', results.basic_stats);
+        try {
+            displayBasicStats(results.basic_stats);
+            console.log('✅ Basic stats displayed');
+        } catch (e) {
+            console.error('❌ Basic stats error:', e);
+        }
         
         // モデル比較チャート - レスポンシブ設定追加
-        console.log('Displaying model comparison...');
-        displayModelComparisonChart(results.model_comparison);
+        console.log('📊 Displaying model comparison...', results.model_comparison);
+        try {
+            displayModelComparisonChart(results.model_comparison);
+            console.log('✅ Model comparison chart displayed');
+        } catch (e) {
+            console.error('❌ Model comparison error:', e);
+        }
         
         // 星評価分布チャート - サイズ調整
-        console.log('Displaying star rating chart...');
-        displayStarRatingChart(results.star_rating_distribution);
+        console.log('⭐ Displaying star rating chart...', results.star_rating_distribution);
+        try {
+            displayStarRatingChart(results.star_rating_distribution);
+            console.log('✅ Star rating chart displayed');
+        } catch (e) {
+            console.error('❌ Star rating chart error:', e);
+        }
         
         // 相関行列 - レスポンシブ対応
-        console.log('Displaying correlation matrix...');
-        displayCorrelationMatrix(results.correlation_matrix);
+        console.log('📈 Displaying correlation matrix...', results.correlation_matrix);
+        try {
+            displayCorrelationMatrix(results.correlation_matrix);
+            console.log('✅ Correlation matrix displayed');
+        } catch (e) {
+            console.error('❌ Correlation matrix error:', e);
+        }
         
         // 病院別分析
-        console.log('Displaying hospital analysis...');
-        displayHospitalAnalysis(results.hospital_analysis);
+        console.log('🏥 Displaying hospital analysis...', results.hospital_analysis);
+        try {
+            displayHospitalAnalysis(results.hospital_analysis);
+            console.log('✅ Hospital analysis displayed');
+        } catch (e) {
+            console.error('❌ Hospital analysis error:', e);
+        }
         
         console.log('All charts displayed successfully');
         
@@ -846,6 +876,23 @@ function displayHospitalAnalysis(hospitalData) {
 
 function downloadSample() {
     window.location.href = '/download_sample';
+}
+
+function exportResults() {
+    if (!analysisResults) {
+        alert('エクスポートする結果がありません。まず分析を実行してください。');
+        return;
+    }
+    
+    console.log('📤 Exporting results...');
+    
+    try {
+        // CSV形式でダウンロード
+        window.location.href = '/export_results';
+    } catch (error) {
+        console.error('❌ Export error:', error);
+        alert('エクスポートエラー: ' + error.message);
+    }
 }
 
 function parseCSV(csvText) {
