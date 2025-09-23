@@ -16,6 +16,23 @@ from werkzeug.utils import secure_filename
 import random
 
 app = Flask(__name__)
+
+def convert_numpy_types(obj):
+    """numpy型をPythonネイティブ型に変換"""
+    if isinstance(obj, dict):
+        return {key: convert_numpy_types(value) for key, value in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_numpy_types(item) for item in obj]
+    elif isinstance(obj, np.integer):
+        return int(obj)
+    elif isinstance(obj, np.floating):
+        return float(obj)
+    elif isinstance(obj, np.ndarray):
+        return obj.tolist()
+    elif isinstance(obj, (np.bool_, bool)):
+        return bool(obj)
+    else:
+        return obj
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 
 # グローバル変数
@@ -345,7 +362,7 @@ def analyze():
         }
         
         # JavaScriptが期待する形式でレスポンスを返す
-        return jsonify({
+        response_data = {
             'success': True,
             'results': {
                 'basic_stats': basic_stats,
@@ -355,7 +372,12 @@ def analyze():
                 'hospital_analysis': hospital_analysis,
                 'model_performance_tests': model_performance_tests
             }
-        })
+        }
+        
+        # numpy型をPythonネイティブ型に変換
+        response_data = convert_numpy_types(response_data)
+        
+        return jsonify(response_data)
         
     except Exception as e:
         import traceback
