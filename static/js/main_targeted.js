@@ -293,15 +293,24 @@ function runAnalysis() {
         console.log('Response data:', data);
         if (data.success) {
             analysisResults = data.results;
-            console.log('Analysis completed successfully');
+            console.log('✅ Analysis completed successfully, results:', analysisResults);
+            console.log('✅ Results type check:', typeof analysisResults);
+            console.log('✅ Results keys:', Object.keys(analysisResults));
             
             showProgressIndicator('chart', 'チャートを生成中...');
             
-            // 結果表示
-            displayAnalysisResults(analysisResults);
-            document.getElementById('runTestBtn').disabled = false;
-            
-            showProgressIndicator('complete', '分析完了');
+            try {
+                // 結果表示
+                console.log('🎨 Starting display...');
+                displayAnalysisResults(analysisResults);
+                document.getElementById('runTestBtn').disabled = false;
+                showProgressIndicator('complete', '分析完了');
+                console.log('✅ Display completed successfully');
+            } catch (displayError) {
+                console.error('❌ Display error:', displayError);
+                showProgressIndicator('error', '表示エラー: ' + displayError.message);
+                alert('表示エラー詳細: ' + displayError.message + '\\n' + displayError.stack);
+            }
         } else {
             showProgressIndicator('error', data.error || '分析に失敗しました');
             console.error('Analysis failed:', data.error);
