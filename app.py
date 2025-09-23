@@ -294,7 +294,19 @@ def bootstrap_mae_difference_test(y_true, y_pred1, y_pred2, n_bootstrap=10000, c
     n = len(y_true)
     mae_differences = []
     
-    for _ in range(n_bootstrap):
+    print(f"統計検定開始: モデル1 vs モデル2")
+    print(f"データ数: {n}")
+    
+    # オリジナルのMAE計算
+    original_mae1 = mean_absolute_error(y_true, y_pred1)
+    original_mae2 = mean_absolute_error(y_true, y_pred2)
+    print(f"オリジナルMAE: モデル1={original_mae1:.4f}, モデル2={original_mae2:.4f}")
+    
+    for i in range(n_bootstrap):
+        # 進行状況表示（1000回ごと）
+        if (i + 1) % 1000 == 0:
+            print(f"ブートストラップ進捗: {i+1}/{n_bootstrap}")
+            
         # リサンプリング
         indices = np.random.choice(n, n, replace=True)
         y_true_boot = [y_true[i] for i in indices]
@@ -315,6 +327,8 @@ def bootstrap_mae_difference_test(y_true, y_pred1, y_pred2, n_bootstrap=10000, c
     
     ci_lower = np.percentile(mae_differences, lower_percentile)
     ci_upper = np.percentile(mae_differences, upper_percentile)
+    
+    print(f"95%信頼区間: [{ci_lower:.4f}, {ci_upper:.4f}]")
     
     return ci_lower, ci_upper, mae_differences
 
@@ -658,4 +672,4 @@ def load_sample():
         return jsonify({'error': f'サンプルロードエラー: {str(e)}'}), 500
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5003)
+    app.run(debug=True, host='0.0.0.0', port=5004)

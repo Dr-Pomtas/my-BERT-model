@@ -176,31 +176,95 @@ document.addEventListener('DOMContentLoaded', function() {
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                layout: {
+                    padding: {
+                        top: 20,
+                        bottom: 20,
+                        left: 10,
+                        right: 10
+                    }
+                },
                 plugins: {
                     title: {
                         display: true,
-                        text: '星評価分布'
+                        text: '星評価分布',
+                        font: {
+                            size: 14,
+                            weight: 'bold'
+                        }
                     },
                     legend: {
                         display: false
+                    },
+                    tooltip: {
+                        callbacks: {
+                            title: function(context) {
+                                return context[0].label;
+                            },
+                            label: function(context) {
+                                return `口コミ数: ${context.parsed.y}件`;
+                            }
+                        }
                     }
                 },
                 scales: {
                     y: {
                         beginAtZero: true,
+                        ticks: {
+                            stepSize: 1,
+                            font: {
+                                size: 12
+                            }
+                        },
                         title: {
                             display: true,
-                            text: '口コミ数'
+                            text: '口コミ数',
+                            font: {
+                                size: 12,
+                                weight: 'bold'
+                            }
                         }
                     },
                     x: {
+                        ticks: {
+                            font: {
+                                size: 12
+                            }
+                        },
                         title: {
                             display: true,
-                            text: '星評価'
+                            text: '星評価',
+                            font: {
+                                size: 12,
+                                weight: 'bold'
+                            }
                         }
                     }
+                },
+                // データラベルを表示
+                onHover: function(event, activeElements) {
+                    event.native.target.style.cursor = activeElements.length > 0 ? 'pointer' : 'default';
                 }
-            }
+            },
+            plugins: [{
+                id: 'datalabels',
+                afterDatasetsDraw: function(chart) {
+                    const ctx = chart.ctx;
+                    chart.data.datasets.forEach((dataset, i) => {
+                        const meta = chart.getDatasetMeta(i);
+                        meta.data.forEach((bar, index) => {
+                            const data = dataset.data[index];
+                            if (data > 0) {
+                                ctx.fillStyle = '#000';
+                                ctx.font = 'bold 12px Arial';
+                                ctx.textAlign = 'center';
+                                ctx.textBaseline = 'bottom';
+                                ctx.fillText(data + '件', bar.x, bar.y - 5);
+                            }
+                        });
+                    });
+                }
+            }]
         });
     }
 
@@ -210,21 +274,23 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // プログレステキストの更新
         let progressSteps = [
-            'データ前処理中...',
-            'モデル A で分析中...',
-            'モデル B で分析中...',
-            'モデル C で分析中...',
-            '病院単位での集計中...',
-            'パフォーマンス評価中...'
+            '📋 データ前処理中...',
+            '🤖 Model A で感情分析中...',
+            '🤖 Model B で感情分析中...',
+            '🤖 Model C で感情分析中...',
+            '🏥 病院単位での集計中...',
+            '📊 パフォーマンス評価中...',
+            '📈 相関分析実行中...',
+            '✅ 分析完了！結果を準備中...'
         ];
         
         let stepIndex = 0;
         const progressInterval = setInterval(() => {
             if (stepIndex < progressSteps.length) {
-                document.getElementById('progressText').textContent = progressSteps[stepIndex];
+                document.getElementById('progressText').innerHTML = progressSteps[stepIndex];
                 stepIndex++;
             }
-        }, 2000);
+        }, 3000); // 少し長めの間隔で進行感を演出
 
         fetch('/analyze', {
             method: 'POST',
@@ -276,6 +342,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // 統計検定用のUIを設定
             setupStatisticalTestUI(data);
+
+            // 統計検定セクションを表示
+            const statisticalTestSection = document.getElementById('statisticalTestSection');
+            if (statisticalTestSection) {
+                statisticalTestSection.style.display = 'block';
+            }
 
             resultsSection.style.display = 'block';
             resultsSection.classList.add('fade-in');
@@ -471,29 +543,43 @@ document.addEventListener('DOMContentLoaded', function() {
         const model1Select = document.getElementById('model1Select');
         const model2Select = document.getElementById('model2Select');
         
-        if (!model1Select || !model2Select) return;
+        if (!model1Select || !model2Select) {
+            console.error('統計検定のプルダウンメニューが見つかりません');
+            return;
+        }
 
         // ドロップダウンをクリア
         model1Select.innerHTML = '<option value="">選択してください</option>';
         model2Select.innerHTML = '<option value="">選択してください</option>';
 
         // モデルリストを追加
-        data.model_list.forEach(model => {
-            const option1 = new Option(model, model);
-            const option2 = new Option(model, model);
-            model1Select.appendChild(option1);
-            model2Select.appendChild(option2);
-        });
+        if (data.model_list && data.model_list.length > 0) {
+            data.model_list.forEach(model => {
+                const option1 = document.createElement('option');
+                option1.value = model;
+                option1.textContent = model;
+                model1Select.appendChild(option1);
 
-        // デフォルト選択（MAEが最も小さいモデルと2番目に小さいモデル）
-        if (data.best_model) {
-            model1Select.value = data.best_model;
-        }
-        if (data.second_best_model) {
-            model2Select.value = data.second_best_model;
-        }
+                const option2 = document.createElement('option');
+                option2.value = model;
+                option2.textContent = model;
+                model2Select.appendChild(option2);
+            });
 
-        console.log(`デフォルト設定: モデル1=${data.best_model}, モデル2=${data.second_best_model}`);
+            // デフォルト選択（MAEが最も小さいモデルと2番目に小さいモデル）
+            if (data.best_model) {
+                model1Select.value = data.best_model;
+                console.log(`モデル1にデフォルト設定: ${data.best_model}`);
+            }
+            if (data.second_best_model) {
+                model2Select.value = data.second_best_model;
+                console.log(`モデル2にデフォルト設定: ${data.second_best_model}`);
+            }
+
+            console.log(`統計検定UI設定完了: モデル1=${data.best_model}, モデル2=${data.second_best_model}`);
+        } else {
+            console.error('モデルリストが空です:', data);
+        }
     }
 
     function runStatisticalTest() {
@@ -607,14 +693,23 @@ document.addEventListener('DOMContentLoaded', function() {
                 showAlert('サンプルデータを正常に読み込みました！', 'success');
                 displayStats(data.stats);
                 
-                // アップロードエリアを成功状態に変更
+                // アップロードエリアを成功状態に変更（ファイル選択要素は非表示）
                 uploadArea.classList.add('sample-success');
                 uploadArea.innerHTML = `
                     <div class="sample-loaded">
-                        <i class="fas fa-check-circle"></i>
-                        <strong>サンプルデータ読み込み完了</strong>
+                        <i class="fas fa-check-circle fa-2x text-success mb-3"></i>
+                        <h5><strong>サンプルデータ読み込み完了</strong></h5>
                         <div class="mt-2">
-                            <small>動物病院口コミサンプル (${data.stats.total_reviews}件の口コミ、${data.stats.unique_hospitals}病院)</small>
+                            <div class="alert alert-success mb-0">
+                                <strong>動物病院口コミサンプル</strong><br>
+                                📊 ${data.stats.total_reviews}件の口コミ | 🏥 ${data.stats.unique_hospitals}病院<br>
+                                ⭐ 平均評価: ${data.stats.avg_star_rating.toFixed(2)}
+                            </div>
+                        </div>
+                        <div class="mt-3">
+                            <button class="btn btn-outline-primary btn-sm" onclick="location.reload()">
+                                <i class="fas fa-refresh me-1"></i>別のファイルを使用
+                            </button>
                         </div>
                     </div>
                 `;
