@@ -359,18 +359,41 @@ def upload_file():
 def analyze():
     global analysis_results
     
-    # リクエストからデータを取得
-    request_data = request.get_json()
-    if not request_data or 'data' not in request_data:
-        return jsonify({'error': 'データが送信されていません'}), 400
+    try:
+        print("=== /analyze エンドポイント開始 ===")
+        
+        # リクエストからデータを取得
+        request_data = request.get_json()
+        print(f"リクエストデータ受信: {type(request_data)}")
+        
+        if not request_data:
+            print("ERROR: リクエストデータが None")
+            return jsonify({'error': 'リクエストデータがありません。JSONデータを送信してください。'}), 400
+        
+        if 'data' not in request_data:
+            print(f"ERROR: 'data'キーが存在しません。利用可能キー: {list(request_data.keys())}")
+            return jsonify({'error': f'dataキーが不足しています。利用可能キー: {list(request_data.keys())}'}), 400
+        
+        print(f"データ配列長: {len(request_data['data']) if isinstance(request_data['data'], list) else 'not list'}")
+        
+        # アップロードされたデータをDataFrameに変換
+        uploaded_data = pd.DataFrame(request_data['data'])
+        print(f"DataFrame作成成功: shape={uploaded_data.shape}")
+        print(f"カラム: {uploaded_data.columns.tolist()}")
+        
+        # データ型と必須カラムのチェック
+        required_columns = ['hospital_id', 'review_text', 'star_rating']
+        missing_columns = [col for col in required_columns if col not in uploaded_data.columns]
+        if missing_columns:
+            print(f"ERROR: 必須カラム不足: {missing_columns}")
+            return jsonify({'error': f'必要な列が不足しています: {missing_columns}。存在する列: {uploaded_data.columns.tolist()}'}), 400
     
-    # アップロードされたデータをDataFrameに変換
-    uploaded_data = pd.DataFrame(request_data['data'])
-    
-    # データ型と必須カラムのチェック
-    required_columns = ['hospital_id', 'review_text', 'star_rating']
-    if not all(col in uploaded_data.columns for col in required_columns):
-        return jsonify({'error': f'必要な列が不足しています: {required_columns}'}), 400
+    except Exception as e:
+        print(f"ERROR: リクエスト処理中にエラー発生: {str(e)}")
+        print(f"ERROR: エラータイプ: {type(e)}")
+        import traceback
+        print(f"ERROR: トレースバック:\n{traceback.format_exc()}")
+        return jsonify({'error': f'リクエスト処理エラー: {str(e)}'}), 400
     
     print(f"受信データ: {len(uploaded_data)}件")
     print(f"星評価カラムの型: {uploaded_data['star_rating'].dtype}")
