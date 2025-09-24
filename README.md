@@ -99,10 +99,11 @@ hospital_id,review_text,star_rating
 
 ## 🌐 デプロイメント
 
-### Cloudflare Pages
+### Render.com デプロイメント
 - **プロジェクト名**: veterinary-bert-analysis
-- **自動デプロイ**: GitHub連携
-- **永続URL**: 準備中（GitHubリポジトリから直接デプロイ）
+- **自動デプロイ**: GitHub連携済み
+- **永続URL**: https://veterinary-bert-analysis.onrender.com（デプロイ後）
+- **プラン**: 無料プラン（750時間/月）
 
 ### Docker対応
 ```bash
