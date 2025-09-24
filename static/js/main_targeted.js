@@ -861,13 +861,13 @@ function displaySentimentDistributionChart(sentimentData) {
             const data = sentimentData.scatter_data[model];
             const correlation = sentimentData.correlations[model];
             
-            // デバッグ: 星評価データの範囲確認
-            console.log(`Model ${model} star ratings range:`, Math.min(...data.star_ratings), 'to', Math.max(...data.star_ratings));
-            console.log(`First 5 star ratings:`, data.star_ratings.slice(0, 5));
+            // デバッグ: 正規化された星評価データの範囲確認（-2~+2）
+            console.log(`Model ${model} normalized star ratings range:`, Math.min(...data.star_ratings), 'to', Math.max(...data.star_ratings));
+            console.log(`First 5 normalized star ratings (-2~+2):`, data.star_ratings.slice(0, 5));
             
-            // 散布図（サーバー側で既に正規化済み）
+            // 散布図（サーバー側で既に正規化済み: star_score = star_rating - 3）
             traces.push({
-                x: data.star_ratings,  // 既に-2から+2に正規化済み
+                x: data.star_ratings,  // バックエンドで-2から+2に正規化済み（star_score使用）
                 y: data.sentiment_scores,
                 mode: 'markers',
                 type: 'scatter',
