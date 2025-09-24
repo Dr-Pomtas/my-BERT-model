@@ -864,8 +864,10 @@ function displaySentimentDistributionChart(sentimentData) {
             // デバッグ: 正規化された星評価データの範囲確認（-2~+2）
             console.log(`Model ${model} normalized star ratings range:`, Math.min(...data.star_ratings), 'to', Math.max(...data.star_ratings));
             console.log(`First 5 normalized star ratings (-2~+2):`, data.star_ratings.slice(0, 5));
+            console.log(`ALL star ratings for ${model}:`, data.star_ratings);
             
             // 散布図（サーバー側で既に正規化済み: star_score = star_rating - 3）
+            console.log(`PLOTLY TRACE DATA for ${model}:`, data.star_ratings);
             traces.push({
                 x: data.star_ratings,  // バックエンドで-2から+2に正規化済み（star_score使用）
                 y: data.sentiment_scores,
@@ -937,6 +939,17 @@ function displaySentimentDistributionChart(sentimentData) {
         responsive: true,
         displayModeBar: true
     };
+    
+    console.log('=== FINAL PLOTLY DATA BEFORE RENDERING ===');
+    console.log('Number of traces:', traces.length);
+    traces.forEach((trace, index) => {
+        if (trace.mode === 'markers') {
+            console.log(`Trace ${index} (${trace.name}) X data:`, trace.x);
+            console.log(`  X range: ${Math.min(...trace.x)} to ${Math.max(...trace.x)}`);
+        }
+    });
+    console.log('X-axis layout range:', layout.xaxis.range);
+    console.log('Y-axis layout range:', layout.yaxis.range);
     
     Plotly.newPlot('sentimentDistributionChart', traces, layout, config);
 }
