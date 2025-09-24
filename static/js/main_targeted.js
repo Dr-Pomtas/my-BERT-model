@@ -905,10 +905,10 @@ function displaySentimentDistributionChart(sentimentData) {
         title: '星評価と感情スコアの分布（回帰直線付き）',
         xaxis: { 
             title: '星評価スコア（正規化）',
-            range: [-2.5, 3.5],
+            range: [-2.5, 2.5],
             dtick: 1,
-            tickvals: [-2, -1, 0, 1, 2, 3],
-            ticktext: ['★1', '★2', '★3', '★4', '★5', '★6']
+            tickvals: [-2, -1, 0, 1, 2],
+            ticktext: ['★1', '★2', '★3', '★4', '★5']
         },
         yaxis: { 
             title: '感情スコア',
@@ -1659,11 +1659,20 @@ function displayModelComparisonTable(modelData) {
     }
     
     try {
-        // MAE結果を取得（複数のキーパターンに対応）
-        const maeResults = modelData.mae_results || modelData.MAE || modelData;
-        console.log('MAE results for table:', maeResults);
+        // performance_metricsからMAE値を抽出
+        console.log('Raw modelData:', modelData);
         
-        if (!maeResults) {
+        const maeResults = {};
+        // バックエンドのperformance_metricsからMAE値を抽出
+        Object.entries(modelData).forEach(([key, value]) => {
+            if (value && typeof value === 'object' && value.mae !== undefined) {
+                maeResults[key] = value.mae;
+            }
+        });
+        
+        console.log('Extracted MAE results for table:', maeResults);
+        
+        if (!maeResults || Object.keys(maeResults).length === 0) {
             container.innerHTML = '<p class="text-muted">MAE結果が見つかりません</p>';
             return;
         }
