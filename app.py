@@ -438,13 +438,16 @@ def analyze():
         for model_name, display_name in MODELS.items():
             model_col = f'{display_name}_score'
             
-            # 散布図用データ（正規化後の星評価スコアを使用）
-            star_scores_list = scored_data['star_score'].tolist()
-            print(f"Debug: {display_name} star_score range: {min(star_scores_list)} to {max(star_scores_list)}")
-            print(f"Debug: First 5 star_scores: {star_scores_list[:5]}")
+            # 散布図用データ（強制的に正規化: 1-5 → -2~+2）
+            original_ratings = scored_data['star_rating'].tolist()
+            normalized_ratings = [(rating - 3) for rating in original_ratings]  # 確実に正規化
+            
+            print(f"Debug: {display_name} original star_rating range: {min(original_ratings)} to {max(original_ratings)}")
+            print(f"Debug: {display_name} normalized star_score range: {min(normalized_ratings)} to {max(normalized_ratings)}")
+            print(f"Debug: First 5 normalized star_scores: {normalized_ratings[:5]}")
             
             scatter_data[display_name] = {
-                'star_ratings': star_scores_list,
+                'star_ratings': normalized_ratings,  # 確実に正規化されたデータ
                 'sentiment_scores': scored_data[model_col].tolist()
             }
             
