@@ -381,6 +381,17 @@ def analyze():
         print(f"DataFrame作成成功: shape={uploaded_data.shape}")
         print(f"カラム: {uploaded_data.columns.tolist()}")
         
+        # カラム名の正規化（日本語・英語両対応）
+        column_mapping = {
+            '動物病院ID': 'hospital_id',
+            '口コミテキスト': 'review_text', 
+            '星評価': 'star_rating'
+        }
+        
+        # カラム名を英語に統一
+        uploaded_data = uploaded_data.rename(columns=column_mapping)
+        print(f"カラム名正規化後: {uploaded_data.columns.tolist()}")
+        
         # データ型と必須カラムのチェック
         required_columns = ['hospital_id', 'review_text', 'star_rating']
         missing_columns = [col for col in required_columns if col not in uploaded_data.columns]
