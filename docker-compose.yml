@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  veterinary-analysis:
+    build: .
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_ENV=production
+      - FLASK_APP=app.py
+    volumes:
+      - ./uploads:/app/uploads
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.veterinary-analysis.rule=Host(`your-domain.com`)"
+      - "traefik.http.routers.veterinary-analysis.tls=true"
+      - "traefik.http.routers.veterinary-analysis.tls.certresolver=letsencrypt"
+
+networks:
+  default:
+    name: veterinary-analysis-network

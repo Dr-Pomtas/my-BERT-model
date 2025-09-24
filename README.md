@@ -1,95 +1,174 @@
-# 動物病院口コミ分析システム
+# 🏥 動物病院口コミ分析システム
 
-## 概要
+[![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://python.org)
+[![Flask](https://img.shields.io/badge/Flask-2.0+-green.svg)](https://flask.palletsprojects.com/)
+[![BERT](https://img.shields.io/badge/BERT-Japanese-orange.svg)](https://huggingface.co/transformers/)
+[![Bootstrap](https://img.shields.io/badge/Bootstrap-5.0-purple.svg)](https://getbootstrap.com/)
 
-本システムは、動物病院の口コミデータを分析し、複数のBERTモデルによる感情分析の性能を比較するための研究支援アプリケーションです。
+> 3つの日本語BERTモデルによる動物病院口コミの感情分析システム
 
-## 機能
+## 🎯 概要
 
-### 1. データアップロード
-- CSVファイルのアップロード機能
-- データの基本統計量表示（総口コミ数、病院数、平均星評価、星評価分布）
+本システムは、動物病院の口コミデータを複数の日本語BERTモデルで分析し、感情スコアと星評価の関係を統計的に評価する研究用Webアプリケーションです。
 
-### 2. 感情分析とモデル比較
-以下の3つの日本語BERTモデルを使用した感情分析を実行します：
-- `koheiduck/bert-japanese-finetuned-sentiment`
-- `llm-book/bert-base-japanese-v2-finetuned-sentiment` 
-- `Mizuiro-inc/bert-base-japanese-finetuned-sentiment-analysis`
+### ✨ 主要機能
 
-### 3. 結果の可視化
-- モデル性能比較（相関係数、平均絶対誤差）
-- 散布図による相関関係の可視化
-- 結果のCSVエクスポート機能
+- **🤖 マルチモデル分析**: 3つの日本語BERTモデルによる感情分析
+- **📊 統計的評価**: ブートストラップ法（10,000回）による信頼区間推定
+- **📈 視覚化**: 散布図、円グラフ、性能比較表
+- **🔢 正規化処理**: 星評価を-2~+2に正規化
+- **📋 CSV対応**: UTF-8 BOM対応の日本語出力
 
-## データ形式
+## 🏗️ システム構成
 
-入力CSVファイルは以下の列を含む必要があります：
+### 使用モデル
+1. **cl-tohoku/bert-base-japanese-whole-word-masking** (Koheiduck)
+2. **llm-book/bert-base-japanese-v3** (LLM-book)  
+3. **Mizuiro-sakura/luke-japanese-base-finetuned-vet** (Mizuiro)
 
-- `hospital_id`: 動物病院ID
-- `review_text`: 口コミテキスト  
-- `star_rating`: 星評価（1-5の整数）
+### 技術スタック
+- **Backend**: Flask, Transformers, pandas, scipy
+- **Frontend**: Bootstrap 5, Plotly.js, Canvas API
+- **Analysis**: ブートストラップ統計、相関分析、MAE評価
 
-## スコア計算
+## 🚀 クイックスタート
 
-### 口コミスコア
-各モデルで、口コミごとにポジティブ確率 P(pos) とネガティブ確率 P(neg) を計算し、以下の式でスコア化：
-
-```
-口コミスコア = (P(pos) × 2) - (P(neg) × 2)
-```
-
-### 星評価スコア
-星評価を以下の式でスコア化：
-
-```
-星評価スコア = 星評価 - 3
-```
-
-両スコアとも -2.0 から +2.0 の範囲に正規化されます。
-
-## セットアップ
-
-### 必要なパッケージ
-
+### 1. 環境セットアップ
 ```bash
-pip install -r requirements.txt
+# リポジトリクローン
+git clone https://github.com/Dr-Pomtas/my-BERT-model.git
+cd my-BERT-model
+
+# 依存関係インストール
+pip install flask transformers torch pandas numpy scipy plotly
 ```
 
-### 実行方法
-
+### 2. アプリケーション起動
 ```bash
 python app.py
 ```
 
-アプリケーションは http://localhost:5000 でアクセスできます。
+### 3. アクセス
+ブラウザで `http://localhost:5000` にアクセス
 
-## サンプルデータ
+## 📁 データフォーマット
 
-以下のサンプルデータファイルが利用可能です：
+### 入力CSV
+```csv
+hospital_id,review_text,star_rating
+1,"とても良い病院でした。先生が優しかったです。",5
+2,"待ち時間が長くて困りました。",2
+3,"普通の病院だと思います。",3
+```
 
-- `sample_data.csv` - 基本サンプルデータ（46口コミ、4病院）
-- `動物病院口コミサンプル.csv` - 充実した口コミサンプル（46口コミ、4病院）
+### 出力データ
+- 感情スコア（各モデル別）
+- 正規化星評価（-2~+2）
+- 統計分析結果
+- 相関係数・信頼区間
 
-### データの特徴
-- **H001**: 高評価病院（全て5星、8口コミ）- 優秀なサービス
-- **H002**: 中高評価病院（5-3星、16口コミ）- バランス型
-- **H003**: 中低評価病院（3-2星、12口コミ）- 改善必要
-- **H004**: 低評価病院（全て1星、10口コミ）- 問題あり
+## 📊 分析結果の見方
 
-実際の動物病院口コミを模した、リアルで詳細な内容になっています。
+### 散布図
+- **X軸**: 星評価スコア（★1(-2) ~ ★5(+2)）
+- **Y軸**: 感情スコア（-2~+2）
+- **回帰直線**: モデルの予測精度を示す
 
-## 技術仕様
+### 性能比較表
+- **MAE値**: 平均絶対誤差（小さいほど高性能）
+- **性能ランク**: 1位/2位/3位
+- **評価レベル**: 優秀/良好/標準/要改善
 
-- **フレームワーク**: Flask
-- **フロントエンド**: Bootstrap 5, Chart.js, Plotly.js
-- **機械学習**: Transformers, PyTorch
-- **データ処理**: Pandas, NumPy
-- **可視化**: Plotly, Matplotlib, Seaborn
+### 統計分析
+- **相関係数**: 星評価との相関の強さ
+- **95%信頼区間**: ブートストラップ法による推定
+- **統計的有意性**: p値による判定
 
-## 研究目的
+## 🔬 研究応用
 
-本システムは動物病院の経営意識とオンライン評価の関連性を解明するための研究の第一段階（最適な感情分析モデルの選定）を支援します。
+### 適用分野
+- 動物病院サービス評価分析
+- 感情分析モデルの性能比較研究
+- 顧客満足度と感情表現の関係分析
+- 日本語NLPモデルのベンチマーク
 
-## ライセンス
+### 統計手法
+- **ブートストラップ法**: 10,000回リサンプリング
+- **Pearson相関分析**: 星評価と感情スコアの関係
+- **MAE比較**: モデル予測精度の定量評価
 
-このプロジェクトは研究目的で開発されています。
+## 🌐 デプロイメント
+
+### Cloudflare Pages
+- **プロジェクト名**: veterinary-bert-analysis
+- **自動デプロイ**: GitHub連携
+- **カスタムドメイン**: 設定可能
+
+### Docker対応
+```bash
+# 将来的なコンテナ化対応予定
+docker build -t veterinary-analysis .
+docker run -p 5000:5000 veterinary-analysis
+```
+
+## 🛠️ カスタマイズ
+
+### 新しいBERTモデル追加
+```python
+# app.py内のMODELS辞書に追加
+MODELS = {
+    'your-model-name': 'Display Name',
+    # 既存モデル...
+}
+```
+
+### UI調整
+- `templates/index.html`: HTML構造
+- `static/css/style.css`: スタイル
+- `static/js/main_targeted.js`: JavaScript機能
+
+## 📈 パフォーマンス
+
+### 処理速度
+- **小規模データ** (< 100件): 数秒
+- **中規模データ** (< 1000件): 数十秒  
+- **大規模データ** (< 10000件): 数分
+
+### システム要件
+- **Python**: 3.8以上
+- **メモリ**: 4GB以上推奨
+- **GPU**: CUDA対応（オプション、高速化）
+
+## 🤝 貢献
+
+### 貢献方法
+1. Forkを作成
+2. 機能ブランチを作成 (`git checkout -b feature/amazing-feature`)
+3. 変更をコミット (`git commit -m 'Add amazing feature'`)
+4. ブランチにプッシュ (`git push origin feature/amazing-feature`)
+5. Pull Requestを作成
+
+### 課題報告
+- GitHubのIssuesを使用
+- バグレポート・機能要望歓迎
+
+## 📄 ライセンス
+
+本プロジェクトは研究用途でのみ利用可能です。商用利用については別途ご相談ください。
+
+## 👨‍💻 開発者
+
+**Dr-Pomtas** - [GitHub Profile](https://github.com/Dr-Pomtas)
+
+---
+
+## 🔗 関連リンク
+
+- [Hugging Face Transformers](https://huggingface.co/transformers/)
+- [Flask Documentation](https://flask.palletsprojects.com/)
+- [Bootstrap 5](https://getbootstrap.com/)
+- [Plotly.js](https://plotly.com/javascript/)
+
+---
+
+**⭐ このプロジェクトが役に立った場合は、GitHubでスターをつけてください！**
