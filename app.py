@@ -14,6 +14,11 @@ import io
 import base64
 from werkzeug.utils import secure_filename
 import random
+import logging
+
+# ログ設定
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
@@ -1061,9 +1066,10 @@ if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     debug = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
     
-    print(f"🚀 Starting Flask app on port {port}")
-    print(f"🔧 Debug mode: {debug}")
-    print(f"📊 Models loaded: {len(MODELS)}")
+    logger.info(f"🚀 Starting Flask app on port {port}")
+    logger.info(f"🔧 Debug mode: {debug}")
+    logger.info(f"📊 Models configured: {len(MODELS)}")
+    logger.info(f"🎯 Mock mode: {os.environ.get('USE_MOCK_MODELS', 'false')}")
     
     app.run(
         debug=debug, 

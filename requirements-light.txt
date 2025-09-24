@@ -1,6 +1,5 @@
+# Lightweight version for Render deployment (without heavy ML libraries)
 Flask==3.0.0
-transformers==4.44.0
-torch==2.5.0
 pandas==2.2.0
 numpy==1.26.0
 scipy==1.11.0
@@ -16,15 +15,7 @@ regex==2024.5.15
 requests==2.32.0
 certifi==2024.2.2
 charset-normalizer==3.3.0
-filelock==3.15.0
-fsspec==2024.6.0
-huggingface-hub==0.24.0
 idna==3.7
-mpmath==1.3.0
-networkx==3.3
-sympy==1.12
-tokenizers==0.19.0
-tqdm==4.66.0
-typing-extensions==4.12.0
 urllib3==2.2.0
 gunicorn==22.0.0
+scikit-learn==1.5.0

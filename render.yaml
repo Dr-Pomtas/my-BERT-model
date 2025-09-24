@@ -3,13 +3,15 @@ services:
     name: veterinary-bert-analysis
     env: python
     plan: free
-    buildCommand: pip install -r requirements.txt
+    buildCommand: pip install -r requirements-light.txt
     startCommand: gunicorn --config gunicorn.conf.py app:app
     envVars:
       - key: PYTHON_VERSION
-        value: 3.9.16
+        value: 3.11.9
       - key: FLASK_ENV
         value: production
+      - key: USE_MOCK_MODELS
+        value: true
       - key: PORT
         generateValue: true
     healthCheckPath: /
