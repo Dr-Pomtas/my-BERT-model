@@ -164,11 +164,15 @@ def calculate_scores(data):
         data['star_rating'] = pd.to_numeric(data['star_rating'], errors='coerce')
         data['star_score'] = data['star_rating'] - 3
         print(f"星評価スコア正規化完了: {data['star_score'].dtype}")
+        print(f"DEBUG: star_rating range: {data['star_rating'].min()} to {data['star_rating'].max()}")
+        print(f"DEBUG: star_score range: {data['star_score'].min()} to {data['star_score'].max()}")
+        print(f"DEBUG: First 5 star_score values: {data['star_score'].head().tolist()}")
     except Exception as e:
         print(f"星評価スコア正規化エラー: {e}")
         # フォールバック: 文字列から数値への変換を試行
         data['star_rating'] = data['star_rating'].astype(str).str.extract(r'(\d+)').astype(float)
         data['star_score'] = data['star_rating'] - 3
+        print(f"DEBUG FALLBACK: star_score range: {data['star_score'].min()} to {data['star_score'].max()}")
     
     return data
 
