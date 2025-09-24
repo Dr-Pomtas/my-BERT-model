@@ -1,0 +1,9 @@
+name = "veterinary-bert-analysis"
+compatibility_date = "2023-09-24"
+pages_build_output_dir = "static"
+
+[env.production]
+name = "veterinary-bert-analysis"
+
+[env.production.vars]
+ENVIRONMENT = "production"

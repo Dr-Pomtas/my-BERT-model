@@ -102,7 +102,7 @@ hospital_id,review_text,star_rating
 ### Cloudflare Pages
 - **プロジェクト名**: veterinary-bert-analysis
 - **自動デプロイ**: GitHub連携
-- **カスタムドメイン**: 設定可能
+- **永続URL**: 準備中（GitHubリポジトリから直接デプロイ）
 
 ### Docker対応
 ```bash

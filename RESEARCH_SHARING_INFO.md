@@ -2,10 +2,12 @@
 
 ## 📍 永久保存先
 
-### 🌐 ライブデモサイト
-**URL**: https://5000-idnebihppheec54fx237x-6532622b.e2b.dev  
-**アクセス**: 即座に利用可能  
-**機能**: フル機能版アプリケーション
+### 🌐 永続アクセス方法
+**⚠️ 注意**: デモサイトは時間制限があります  
+**永続利用**: 以下の方法を使用してください  
+1. **GitHubリポジトリ**: ローカル実行
+2. **Docker**: コンテナでの実行  
+3. **Cloudflare Pages**: 自分でデプロイ
 
 ### 📂 GitHubリポジトリ
 **URL**: https://github.com/Dr-Pomtas/my-BERT-model  
@@ -15,10 +17,11 @@
 
 ## 🚀 共同研究者向けアクセス方法
 
-### 1. 即座に使用開始
-```
-ライブデモサイトにアクセス ↓
-https://5000-idnebihppheec54fx237x-6532622b.e2b.dev
+### 1. GitHubから取得
+```bash
+# 最新版を取得
+git clone https://github.com/Dr-Pomtas/my-BERT-model.git
+cd my-BERT-model
 ```
 
 ### 2. ローカル環境構築
