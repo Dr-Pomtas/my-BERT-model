@@ -912,6 +912,9 @@ function displaySentimentDistributionChart(sentimentData) {
         },
         yaxis: { 
             title: '感情スコア',
+            range: [-2.5, 2.5],
+            dtick: 1,
+            tickvals: [-2, -1, 0, 1, 2],
             zeroline: true
         },
         autosize: true,
