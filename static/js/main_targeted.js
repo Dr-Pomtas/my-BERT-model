@@ -910,7 +910,7 @@ function displaySentimentDistributionChart(sentimentData) {
             range: [-2.5, 2.5],
             dtick: 1,
             tickvals: [-2, -1, 0, 1, 2],
-            ticktext: ['★1', '★2', '★3', '★4', '★5']
+            ticktext: ['★1(-2)', '★2(-1)', '★3(0)', '★4(+1)', '★5(+2)']
         },
         yaxis: { 
             title: '感情スコア',
@@ -940,16 +940,11 @@ function displaySentimentDistributionChart(sentimentData) {
         displayModeBar: true
     };
     
-    console.log('=== FINAL PLOTLY DATA BEFORE RENDERING ===');
-    console.log('Number of traces:', traces.length);
-    traces.forEach((trace, index) => {
-        if (trace.mode === 'markers') {
-            console.log(`Trace ${index} (${trace.name}) X data:`, trace.x);
-            console.log(`  X range: ${Math.min(...trace.x)} to ${Math.max(...trace.x)}`);
-        }
-    });
-    console.log('X-axis layout range:', layout.xaxis.range);
-    console.log('Y-axis layout range:', layout.yaxis.range);
+    // キャッシュクリア用のバージョン更新
+    const plotContainer = document.getElementById('sentimentDistributionChart');
+    if (plotContainer) {
+        plotContainer.innerHTML = ''; // 既存のプロットをクリア
+    }
     
     Plotly.newPlot('sentimentDistributionChart', traces, layout, config);
 }
