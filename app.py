@@ -395,7 +395,7 @@ def analyze():
                 'mae': float(mae)
             }
         
-        # モデル性能比較のブートストラップ検定 (5000回)
+        # モデル性能比較のブートストラップ検定 (10000回)
         model_performance_tests = {}
         model_names_list = list(MODELS.values())
         
@@ -411,7 +411,7 @@ def analyze():
                             hospital_stats['star_score'].tolist(),
                             hospital_stats[col1].tolist(),
                             hospital_stats[col2].tolist(),
-                            n_bootstrap=5000
+                            n_bootstrap=10000
                         )
                         
                         model_performance_tests[f'{model1}_vs_{model2}'] = {
@@ -449,11 +449,11 @@ def analyze():
                 'p_value': float(p_value)
             })
             
-            # ブートストラップ信頼区間 (5000回) - 正規化後の星評価スコアを使用
+            # ブートストラップ信頼区間 (10000回) - 正規化後の星評価スコアを使用
             bootstrap_result = bootstrap_correlation_ci(
                 scored_data['star_score'].tolist(), 
                 scored_data[model_col].tolist(), 
-                n_bootstrap=5000
+                n_bootstrap=10000
             )
             
             correlation_results[display_name] = {

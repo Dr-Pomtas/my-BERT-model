@@ -881,7 +881,7 @@ function displaySentimentDistributionChart(sentimentData) {
             
             // 回帰直線を計算（サーバー側で既に正規化済み）
             const regression = calculateRegression(data.star_ratings, data.sentiment_scores);
-            const xRange = [-2, -1, 0, 1, 2, 3];
+            const xRange = [-2, -1, 0, 1, 2];
             const yRegression = xRange.map(x => regression.slope * x + regression.intercept);
             
             // 回帰直線を追加
