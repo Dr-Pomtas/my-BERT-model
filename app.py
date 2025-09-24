@@ -435,8 +435,12 @@ def analyze():
             model_col = f'{display_name}_score'
             
             # 散布図用データ（正規化後の星評価スコアを使用）
+            star_scores_list = scored_data['star_score'].tolist()
+            print(f"Debug: {display_name} star_score range: {min(star_scores_list)} to {max(star_scores_list)}")
+            print(f"Debug: First 5 star_scores: {star_scores_list[:5]}")
+            
             scatter_data[display_name] = {
-                'star_ratings': scored_data['star_score'].tolist(),
+                'star_ratings': star_scores_list,
                 'sentiment_scores': scored_data[model_col].tolist()
             }
             
