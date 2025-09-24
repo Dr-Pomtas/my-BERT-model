@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Canvas Pie Chart Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .chart-container { border: 1px solid #ccc; margin: 20px 0; }
+        canvas { border: 1px solid blue; }
+    </style>
+</head>
+<body>
+    <h1>Canvas Pie Chart Test</h1>
+    <p>This tests the Canvas pie chart without Chart.js dependency</p>
+    
+    <div class="chart-container">
+        <h3>Star Rating Distribution</h3>
+        <div id="starRatingChart"></div>
+    </div>
+    
+    <div class="chart-container">
+        <h3>Model Performance Comparison</h3>
+        <div id="modelChart"></div>
+    </div>
+    
+    <button id="testButton">Run Test</button>
+
+    <script>
+        // Test data
+        const starData = {
+            '1': 5,
+            '2': 8,
+            '3': 15,
+            '4': 22,
+            '5': 35
+        };
+        
+        const modelData = {
+            'Model A (Koheiduck)': { mae: 0.85, correlation: 0.72 },
+            'Model B (LLM-book)': { mae: 0.78, correlation: 0.75 },
+            'Model C (Mizuiro)': { mae: 0.91, correlation: 0.68 }
+        };
+
+        function createCanvasPieChart(containerId, data) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = '';
+            
+            // Create canvas
+            const canvas = document.createElement('canvas');
+            canvas.width = 300;
+            canvas.height = 300;
+            canvas.style.border = '1px solid green';
+            container.appendChild(canvas);
+            
+            const ctx = canvas.getContext('2d');
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            const radius = Math.min(centerX, centerY) - 40;
+            
+            const colors = ['#dc3545', '#fd7e14', '#ffc107', '#198754', '#20c997'];
+            const total = Object.values(data).reduce((sum, count) => sum + count, 0);
+            
+            let currentAngle = 0;
+            
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw pie slices
+            Object.keys(data).forEach((key, index) => {
+                const count = data[key] || 0;
+                const angle = total > 0 ? (count / total) * 2 * Math.PI : 0;
+                
+                if (angle > 0) {
+                    ctx.beginPath();
+                    ctx.arc(centerX, centerY, radius, currentAngle, currentAngle + angle);
+                    ctx.lineTo(centerX, centerY);
+                    ctx.fillStyle = colors[index];
+                    ctx.fill();
+                    ctx.strokeStyle = '#fff';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                    currentAngle += angle;
+                    
+                    // Add labels
+                    const labelAngle = currentAngle - angle / 2;
+                    const labelX = centerX + Math.cos(labelAngle) * (radius * 0.7);
+                    const labelY = centerY + Math.sin(labelAngle) * (radius * 0.7);
+                    
+                    ctx.fillStyle = '#000';
+                    ctx.font = '12px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(`★${key}`, labelX, labelY);
+                    ctx.fillText(`${count}`, labelX, labelY + 15);
+                }
+            });
+            
+            // Title
+            ctx.fillStyle = '#000';
+            ctx.font = '16px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('星評価分布', centerX, 30);
+            
+            console.log(`Canvas pie chart created for ${containerId}`);
+        }
+        
+        function createModelComparisonTable(containerId, data) {
+            const container = document.getElementById(containerId);
+            const models = Object.keys(data);
+            
+            let html = `
+                <div style="border: 1px solid #ddd; padding: 15px;">
+                    <h4>モデル性能比較</h4>
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <thead>
+                            <tr style="background: #f8f9fa;">
+                                <th style="border: 1px solid #ddd; padding: 8px;">モデル</th>
+                                <th style="border: 1px solid #ddd; padding: 8px;">MAE</th>
+                                <th style="border: 1px solid #ddd; padding: 8px;">相関係数</th>
+                                <th style="border: 1px solid #ddd; padding: 8px;">性能ランク</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+            
+            const sortedModels = models.sort((a, b) => data[a].mae - data[b].mae);
+            
+            sortedModels.forEach((model, index) => {
+                const mae = data[model].mae;
+                const correlation = data[model].correlation;
+                const rank = index + 1;
+                const rankIcon = rank === 1 ? '🥇' : rank === 2 ? '🥈' : '🥉';
+                
+                html += `
+                    <tr>
+                        <td style="border: 1px solid #ddd; padding: 8px;"><strong>${model}</strong></td>
+                        <td style="border: 1px solid #ddd; padding: 8px;">${mae.toFixed(4)}</td>
+                        <td style="border: 1px solid #ddd; padding: 8px;">${correlation.toFixed(3)}</td>
+                        <td style="border: 1px solid #ddd; padding: 8px;">${rankIcon} ${rank}位</td>
+                    </tr>
+                `;
+            });
+            
+            html += `
+                        </tbody>
+                    </table>
+                </div>
+            `;
+            
+            container.innerHTML = html;
+            console.log(`Model comparison table created for ${containerId}`);
+        }
+
+        document.getElementById('testButton').addEventListener('click', function() {
+            console.log('Running canvas test...');
+            createCanvasPieChart('starRatingChart', starData);
+            createModelComparisonTable('modelChart', modelData);
+            console.log('Test completed');
+        });
+
+        // Auto run test on load
+        window.addEventListener('load', function() {
+            console.log('Page loaded, running auto test');
+            document.getElementById('testButton').click();
+        });
+    </script>
+</body>
+</html>

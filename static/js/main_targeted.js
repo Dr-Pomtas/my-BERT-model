@@ -10,21 +10,56 @@ let currentCorrelationData = null;
 // DOM読み込み完了時の初期化
 document.addEventListener('DOMContentLoaded', function() {
     console.log('JavaScript loaded - targeted fixes version');
-    initializeApp();
+    
+    // Chart.jsの可用性確認
+    if (typeof Chart === 'undefined') {
+        console.error('Chart.js is not loaded! Charts will not work.');
+        setTimeout(() => {
+            if (typeof Chart !== 'undefined') {
+                console.log('Chart.js loaded after delay');
+                initializeApp();
+            } else {
+                console.error('Chart.js still not available - check CDN');
+                initializeApp(); // Chart.js無しでも基本機能は動作させる
+            }
+        }, 2000);
+    } else {
+        console.log('Chart.js loaded successfully');
+        initializeApp();
+    }
 });
 
 function initializeApp() {
-    // ファイルアップロード関連のイベントリスナー
+    console.log('Initializing app...');
+    
+    // DOM要素の存在確認
     const fileInput = document.getElementById('fileInput');
     const uploadArea = document.getElementById('uploadArea');
     const loadSampleBtn = document.getElementById('loadSampleBtn');
     const analyzeBtn = document.getElementById('analyzeBtn');
     const runTestBtn = document.getElementById('runTestBtn');
-    // const downloadSampleBtn = document.getElementById('downloadSampleBtn'); // 削除済み
     const exportBtn = document.getElementById('exportBtn');
+    
+    console.log('DOM elements:', {
+        fileInput: !!fileInput,
+        uploadArea: !!uploadArea, 
+        loadSampleBtn: !!loadSampleBtn,
+        analyzeBtn: !!analyzeBtn,
+        runTestBtn: !!runTestBtn,
+        exportBtn: !!exportBtn
+    });
+    
+    // より詳細なデバッグ情報
+    if (!fileInput) console.error('fileInput element not found!');
+    if (!uploadArea) console.error('uploadArea element not found!');
+    console.log('Event listeners setup starting...');
 
     if (fileInput) {
+        console.log('Adding change event listener to fileInput');
         fileInput.addEventListener('change', handleFileSelect);
+        console.log('Change event listener added successfully');
+    } else {
+        console.error('fileInput not found - cannot add event listener');
     }
 
     if (uploadArea) {
@@ -150,10 +185,16 @@ function resetUpload() {
 
 
 function handleFileSelect() {
+    console.log('handleFileSelect called');
     const fileInput = document.getElementById('fileInput');
+    console.log('fileInput:', fileInput);
     const file = fileInput.files[0];
+    console.log('Selected file:', file);
     
-    if (!file) return;
+    if (!file) {
+        console.log('No file selected');
+        return;
+    }
     
     if (!file.name.toLowerCase().endsWith('.csv')) {
         alert('CSVファイルを選択してください。');
@@ -373,22 +414,38 @@ function displayAnalysisResults(results) {
             console.error('❌ Basic stats error:', e);
         }
         
-        // モデル比較チャート - レスポンシブ設定追加
+        // モデル比較チャートとテーブル - 強制表示
         console.log('📊 Displaying model comparison...', results.model_comparison);
-        try {
-            displayModelComparisonChart(results.model_comparison);
-            console.log('✅ Model comparison chart displayed');
-        } catch (e) {
-            console.error('❌ Model comparison error:', e);
+        if (results.model_comparison) {
+            try {
+                displayModelComparisonChart(results.model_comparison);
+                console.log('✅ Model comparison chart displayed');
+            } catch (e) {
+                console.error('❌ Model comparison chart error:', e);
+            }
+            
+            try {
+                displayModelComparisonTable(results.model_comparison);
+                console.log('✅ Model comparison table displayed');
+            } catch (e) {
+                console.error('❌ Model comparison table error:', e);
+            }
+        } else {
+            console.error('❌ No model comparison data available');
         }
         
-        // 星評価分布チャート - サイズ調整
+        // 星評価分布チャート - 強制Canvas表示
         console.log('⭐ Displaying star rating chart...', results.star_rating_distribution);
-        try {
-            displayStarRatingChart(results.star_rating_distribution);
-            console.log('✅ Star rating chart displayed');
-        } catch (e) {
-            console.error('❌ Star rating chart error:', e);
+        if (results.star_rating_distribution) {
+            try {
+                displayStarRatingChart(results.star_rating_distribution);
+                console.log('✅ Star rating chart displayed');
+            } catch (e) {
+                console.error('❌ Star rating chart error:', e);
+                console.error('Error details:', e.stack);
+            }
+        } else {
+            console.error('❌ No star rating distribution data available');
         }
         
         // 星評価と感情スコア分布
@@ -448,117 +505,296 @@ function displayAnalysisResults(results) {
 }
 
 function displayStarRatingChart(starData) {
+    console.log('🎯 Creating star rating chart with data:', starData);
     const ctx = document.getElementById('starRatingChart');
-    if (!ctx) return;
-    
-    // 既存のチャートを破棄
-    if (window.starChart && typeof window.starChart.destroy === 'function') {
-        window.starChart.destroy();
+    if (!ctx) {
+        console.error('⚠️ starRatingChart element not found');
+        return;
     }
     
-    // 修正: チャート表示の切れ問題 - レスポンシブ設定とアスペクト比調整
-    window.starChart = new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: ['★1', '★2', '★3', '★4', '★5'],
-            datasets: [{
-                label: 'レビュー数',
-                data: [
-                    starData['1'] || 0,
-                    starData['2'] || 0,
-                    starData['3'] || 0,
-                    starData['4'] || 0,
-                    starData['5'] || 0
-                ],
-                backgroundColor: [
-                    '#dc3545', '#fd7e14', '#ffc107', '#198754', '#20c997'
-                ],
-                borderColor: [
-                    '#dc3545', '#fd7e14', '#ffc107', '#198754', '#20c997'
-                ],
-                borderWidth: 1
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: true,
-            aspectRatio: 2.5, // 横長に調整
-            layout: {
-                padding: {
-                    top: 10,
-                    bottom: 10,
-                    left: 10,
-                    right: 10
-                }
-            },
-
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    max: Math.max(...Object.values(starData)) + 5, // データの最大値+5に変更
-                    title: {
-                        display: true,
-                        text: '口コミ数'
-                    },
-                    ticks: {
-                        font: {
-                            size: 11
-                        },
-                        stepSize: 1
-                    }
-                },
-                x: {
-                    title: {
-                        display: true,
-                        text: '星評価'
-                    },
-                    ticks: {
-                        font: {
-                            size: 11
-                        }
-                    }
-                }
-            },
-            plugins: {
-                legend: {
-                    display: true,
-                    position: 'top',
-                    labels: {
-                        font: {
-                            size: 12
-                        }
-                    }
-                },
-                title: {
-                    display: true,
-                    text: '星評価分布',
-                    font: {
-                        size: 14
-                    }
-                },
-                datalabels: {
-                    anchor: 'end',
-                    align: 'top',
-                    formatter: function(value, context) {
-                        return value;
-                    },
-                    font: {
-                        weight: 'bold'
-                    }
-                }
-            }
+    // Chart.js利用不可のため、常にCanvasフォールバックを使用
+    console.log('📊 Creating Canvas pie chart for star ratings...');
+    
+    const total = Object.values(starData).reduce((sum, count) => sum + count, 0);
+    console.log(`📈 Total reviews: ${total}`);
+    
+    if (total === 0) {
+        ctx.innerHTML = '<div class="alert alert-warning">星評価データがありません</div>';
+        return;
+    }
+    
+    // コンテナをクリアしてCanvasを作成
+    ctx.innerHTML = '';
+    const canvasContainer = document.createElement('div');
+    canvasContainer.style.textAlign = 'center';
+    
+    const canvas = document.createElement('canvas');
+    canvas.width = 300;
+    canvas.height = 300;
+    canvas.style.border = '2px solid #e9ecef';
+    canvas.style.borderRadius = '8px';
+    canvas.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
+    canvasContainer.appendChild(canvas);
+    ctx.appendChild(canvasContainer);
+    
+    // 改良版円グラフを描画
+    const context = canvas.getContext('2d');
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height / 2;
+    const radius = Math.min(centerX, centerY) - 60;
+    
+    const colors = ['#dc3545', '#fd7e14', '#ffc107', '#198754', '#20c997'];
+    let currentAngle = -Math.PI / 2; // 12時方向から開始
+    
+    context.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // 円グラフを描画
+    ['1', '2', '3', '4', '5'].forEach((rating, index) => {
+        const count = starData[rating] || 0;
+        const angle = total > 0 ? (count / total) * 2 * Math.PI : 0;
+        
+        if (angle > 0) {
+            // 円グラフのセクションを描画
+            context.beginPath();
+            context.arc(centerX, centerY, radius, currentAngle, currentAngle + angle);
+            context.lineTo(centerX, centerY);
+            context.fillStyle = colors[index];
+            context.fill();
+            context.strokeStyle = '#fff';
+            context.lineWidth = 3;
+            context.stroke();
+            
+            // ラベルを追加（外側）
+            const labelAngle = currentAngle + angle / 2;
+            const labelX = centerX + Math.cos(labelAngle) * (radius * 0.7);
+            const labelY = centerY + Math.sin(labelAngle) * (radius * 0.7);
+            
+            context.fillStyle = '#fff';
+            context.font = 'bold 14px Arial';
+            context.textAlign = 'center';
+            context.fillText(`★${rating}`, labelX, labelY - 5);
+            context.fillText(`${count}件`, labelX, labelY + 12);
+            
+            currentAngle += angle;
         }
     });
+    
+    // タイトルを追加
+    context.fillStyle = '#333';
+    context.font = 'bold 20px Arial';
+    context.textAlign = 'center';
+    context.fillText('星評価分布', centerX, 30);
+    
+    // 合計件数表示
+    context.fillStyle = '#666';
+    context.font = '16px Arial';
+    context.fillText(`合計: ${total}件`, centerX, canvas.height - 15);
+    
+    // テーブルも追加
+    const tableHtml = `
+        <div class="mt-3">
+            <h6><i class="fas fa-table me-2"></i>星評価詳細</h6>
+            <table class="table table-sm table-striped">
+                <thead class="table-dark">
+                    <tr><th>星評価</th><th>件数</th><th>割合</th></tr>
+                </thead>
+                <tbody>
+                    ${['1', '2', '3', '4', '5'].map((rating, index) => {
+                        const count = starData[rating] || 0;
+                        const percentage = total > 0 ? ((count / total) * 100).toFixed(1) : 0;
+                        return `<tr>
+                            <td><span style="color: ${colors[index]}; font-weight: bold;">★${rating}</span></td>
+                            <td>${count}件</td>
+                            <td>${percentage}%</td>
+                        </tr>`;
+                    }).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
+    
+    const tableDiv = document.createElement('div');
+    tableDiv.innerHTML = tableHtml;
+    ctx.appendChild(tableDiv);
+    
+    console.log('✅ Canvas pie chart created successfully');
+}
+
+
+function displayModelComparisonTable(modelData) {
+    console.log('🎯 Creating model comparison table with data:', modelData);
+    const container = document.getElementById('modelComparisonTable');
+    if (!container) {
+        console.error('⚠️ modelComparisonTable element not found');
+        return;
+    }
+    
+    const models = Object.keys(modelData);
+    
+    let html = `
+        <div class="card mt-3">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="fas fa-table me-2"></i>モデル性能詳細比較表</h6>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>モデル名</th>
+                                <th>MAE (Mean Absolute Error)</th>
+                                <th>相関係数</th>
+                                <th>性能ランク</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+    `;
+    
+    // MAEでソート（昇順 - 低いほど良い）
+    const sortedModels = models.sort((a, b) => (modelData[a].mae || 0) - (modelData[b].mae || 0));
+    
+    sortedModels.forEach((model, index) => {
+        const data = modelData[model];
+        const modelName = model.replace('cl-tohoku/', '').replace('/bert-base-japanese', '');
+        const mae = data.mae || 0;
+        const correlation = data.correlation || 0;
+        const rank = index + 1;
+        const rankBadge = rank === 1 ? 'bg-warning' : rank === 2 ? 'bg-secondary' : 'bg-light text-dark';
+        const rankIcon = rank === 1 ? '🥇' : rank === 2 ? '🥈' : '🥉';
+        
+        html += `
+            <tr>
+                <td><strong>${modelName}</strong></td>
+                <td>${mae.toFixed(4)}</td>
+                <td>${correlation.toFixed(3)}</td>
+                <td><span class="badge ${rankBadge}">${rankIcon} ${rank}位</span></td>
+            </tr>
+        `;
+    });
+    
+    html += `
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    container.innerHTML = html;
 }
 
 function displayModelComparisonChart(modelData) {
     const ctx = document.getElementById('modelChart');
     if (!ctx) return;
     
+    // Chart.jsの可用性確認
+    if (typeof Chart === 'undefined') {
+        console.log('Chart.js not available - using enhanced table display for model comparison');
+        // 代替表示: 改良版テーブル形式でモデル性能を表示
+        const models = Object.keys(modelData);
+        
+        // MAEでソート（昇順 - 低いほど高性能）
+        const sortedModels = models.sort((a, b) => (modelData[a].mae || 0) - (modelData[b].mae || 0));
+        
+        let tableHtml = `
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h6 class="mb-0"><i class="fas fa-chart-bar me-2"></i>モデル性能比較詳細</h6>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info mb-3">
+                        <small><i class="fas fa-info-circle me-1"></i>
+                        Chart.jsが利用できないため、テーブル形式で表示しています。
+                        MAE（平均絶対誤差）が低いほど高性能です。
+                        </small>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th><i class="fas fa-trophy me-1"></i>ランク</th>
+                                    <th>モデル名</th>
+                                    <th>MAE <small>(低いほど良い)</small></th>
+                                    <th>相関係数 <small>(高いほど良い)</small></th>
+                                    <th>性能評価</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+        `;
+        
+        sortedModels.forEach((model, index) => {
+            const data = modelData[model];
+            const modelName = model.replace('cl-tohoku/', '').replace('/bert-base-japanese', '').replace('Mizuiro-inc/', '');
+            const mae = data.mae || 0;
+            const correlation = data.correlation || 0;
+            const rank = index + 1;
+            
+            // ランクアイコンとバッジ
+            const rankIcon = rank === 1 ? '🥇' : rank === 2 ? '🥈' : '🥉';
+            const rankBadge = rank === 1 ? 'bg-warning text-dark' : rank === 2 ? 'bg-secondary' : 'bg-info';
+            
+            // 性能レベル判定
+            const performanceLevel = mae < 0.5 ? '優秀' : mae < 1.0 ? '良好' : mae < 1.5 ? '普通' : '要改善';
+            const perfClass = mae < 0.5 ? 'text-success' : mae < 1.0 ? 'text-primary' : mae < 1.5 ? 'text-warning' : 'text-danger';
+            
+            // 相関の強さ
+            const corrStrength = Math.abs(correlation) >= 0.8 ? '非常に強い' : 
+                                Math.abs(correlation) >= 0.6 ? '強い' : 
+                                Math.abs(correlation) >= 0.4 ? '中程度' : '弱い';
+            const corrClass = Math.abs(correlation) >= 0.6 ? 'text-success' : 
+                             Math.abs(correlation) >= 0.4 ? 'text-info' : 'text-secondary';
+            
+            tableHtml += `
+                <tr>
+                    <td>
+                        <span class="badge ${rankBadge} fs-6">${rankIcon} ${rank}位</span>
+                    </td>
+                    <td><strong>${modelName}</strong></td>
+                    <td>
+                        <span class="fs-6 fw-bold">${mae.toFixed(4)}</span>
+                        <br><small class="${perfClass}">${performanceLevel}</small>
+                    </td>
+                    <td>
+                        <span class="fs-6 fw-bold">${correlation.toFixed(3)}</span>
+                        <br><small class="${corrClass}">${corrStrength}</small>
+                    </td>
+                    <td>
+                        <div class="d-flex flex-column align-items-center">
+                            <div class="progress" style="width: 60px; height: 8px;">
+                                <div class="progress-bar ${rank === 1 ? 'bg-success' : rank === 2 ? 'bg-info' : 'bg-secondary'}" 
+                                     style="width: ${100 - (mae * 50)}%"></div>
+                            </div>
+                            <small class="${perfClass} mt-1">${(100 - (mae * 50)).toFixed(0)}%</small>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        });
+        
+        tableHtml += `
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="mt-3">
+                        <small class="text-muted">
+                            <i class="fas fa-lightbulb me-1"></i>
+                            <strong>推奨:</strong> 1位の${sortedModels[0].replace('cl-tohoku/', '').replace('/bert-base-japanese', '').replace('Mizuiro-inc/', '')}が最高性能です。
+                        </small>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        ctx.innerHTML = tableHtml;
+        return;
+    }
+    
     // 既存のチャートを破棄
     if (window.modelChart && typeof window.modelChart.destroy === 'function') {
         window.modelChart.destroy();
     }
+    
+    console.log('Creating Chart.js model comparison chart...');
     
     const models = Object.keys(modelData);
     const maeScores = models.map(model => modelData[model].mae || 0);
@@ -625,9 +861,13 @@ function displaySentimentDistributionChart(sentimentData) {
             const data = sentimentData.scatter_data[model];
             const correlation = sentimentData.correlations[model];
             
-            // 散布図
+            // デバッグ: 星評価データの範囲確認
+            console.log(`Model ${model} star ratings range:`, Math.min(...data.star_ratings), 'to', Math.max(...data.star_ratings));
+            console.log(`First 5 star ratings:`, data.star_ratings.slice(0, 5));
+            
+            // 散布図（サーバー側で既に正規化済み）
             traces.push({
-                x: data.star_ratings,
+                x: data.star_ratings,  // 既に-2から+2に正規化済み
                 y: data.sentiment_scores,
                 mode: 'markers',
                 type: 'scatter',
@@ -639,9 +879,9 @@ function displaySentimentDistributionChart(sentimentData) {
                 }
             });
             
-            // 回帰直線を計算
+            // 回帰直線を計算（サーバー側で既に正規化済み）
             const regression = calculateRegression(data.star_ratings, data.sentiment_scores);
-            const xRange = [1, 2, 3, 4, 5];
+            const xRange = [-2, -1, 0, 1, 2, 3];
             const yRegression = xRange.map(x => regression.slope * x + regression.intercept);
             
             // 回帰直線を追加
@@ -664,9 +904,11 @@ function displaySentimentDistributionChart(sentimentData) {
     const layout = {
         title: '星評価と感情スコアの分布（回帰直線付き）',
         xaxis: { 
-            title: '星評価',
-            range: [0.5, 5.5],
-            dtick: 1
+            title: '星評価スコア（正規化）',
+            range: [-2.5, 3.5],
+            dtick: 1,
+            tickvals: [-2, -1, 0, 1, 2, 3],
+            ticktext: ['★1', '★2', '★3', '★4', '★5', '★6']
         },
         yaxis: { 
             title: '感情スコア',
@@ -973,26 +1215,64 @@ function displayHospitalAnalysis(hospitalData) {
     const container = document.getElementById('hospitalAnalysis');
     if (!container) return;
     
-    let html = '<div class="row">';
+    // テーブル形式で1病院1行表示
+    let html = `
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="fas fa-hospital me-2"></i>病院別分析結果</h6>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>病院ID</th>
+                                <th>レビュー数</th>
+                                <th>平均星評価</th>
+                                <th>Koheiduck</th>
+                                <th>LLM-book</th>
+                                <th>Mizuiro</th>
+                                <th>平均感情スコア</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+    `;
     
     Object.entries(hospitalData).forEach(([hospitalId, data]) => {
+        // デバッグ: データ構造確認
+        console.log(`Hospital ${hospitalId} data keys:`, Object.keys(data));
+        console.log(`Hospital ${hospitalId} data:`, data);
+        
+        // モデルスコアの取得（バックエンドのキー名に合わせる）
+        const koheiduck = data['Model A (Koheiduck)'] || 0;
+        const llmbook = data['Model B (LLM-book)'] || 0;
+        const mizuiro = data['Model C (Mizuiro)'] || 0;
+        console.log(`Model scores - Koheiduck: ${koheiduck}, LLM-book: ${llmbook}, Mizuiro: ${mizuiro}`);
+        
+        // 星評価の取得（複数のキーパターンに対応）
+        const avgRating = data.avg_rating || 0;
+        
         html += `
-            <div class="col-md-6 mb-3">
-                <div class="card">
-                    <div class="card-header">
-                        <h6 class="mb-0">病院 ${hospitalId}</h6>
-                    </div>
-                    <div class="card-body">
-                        <p><strong>レビュー数:</strong> ${data.review_count}件</p>
-                        <p><strong>平均星評価:</strong> ${data.avg_star_rating ? data.avg_star_rating.toFixed(2) : data.avg_rating.toFixed(2)}点</p>
-                        <p><strong>感情スコア平均:</strong> ${data.avg_sentiment.toFixed(3)}</p>
-                    </div>
-                </div>
-            </div>
+            <tr>
+                <td><strong>${hospitalId}</strong></td>
+                <td>${data.review_count}件</td>
+                <td>${avgRating.toFixed(2)}点</td>
+                <td>${(koheiduck || 0).toFixed(3)}</td>
+                <td>${(llmbook || 0).toFixed(3)}</td>
+                <td>${(mizuiro || 0).toFixed(3)}</td>
+                <td><strong>${data.avg_sentiment.toFixed(3)}</strong></td>
+            </tr>
         `;
     });
     
-    html += '</div>';
+    html += `
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    `;
+    
     container.innerHTML = html;
 }
 
@@ -1010,8 +1290,37 @@ function exportResults() {
     console.log('📤 Exporting results...');
     
     try {
-        // CSV形式でダウンロード
-        window.location.href = '/export_results';
+        // POSTリクエストでCSV形式でダウンロード
+        fetch('/export_results', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({})
+        })
+        .then(response => {
+            if (response.ok) {
+                return response.blob();
+            } else {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+        })
+        .then(blob => {
+            // CSVファイルとしてダウンロード
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `veterinary_review_analysis_${new Date().toISOString().slice(0,10)}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+            console.log('✅ Export completed successfully');
+        })
+        .catch(error => {
+            console.error('❌ Export error:', error);
+            alert('エクスポートエラー: ' + error.message);
+        });
     } catch (error) {
         console.error('❌ Export error:', error);
         alert('エクスポートエラー: ' + error.message);
@@ -1098,142 +1407,16 @@ function generateAnalysisInterpretation(results) {
     const avgRating = stats.avg_rating || 0;
     const hospitalCount = stats.unique_hospitals || 0;
     
-    // 相関係数の取得と解釈
-    const correlationStrengths = [];
-    Object.entries(correlations).forEach(([model, data]) => {
-        const correlation = data.correlation || 0;
-        correlationStrengths.push({ model, correlation, strength: getCorrelationStrength(correlation) });
-    });
-    
-    // 最強・最弱の相関を特定
-    const strongestCorrelation = correlationStrengths.reduce((a, b) => 
-        Math.abs(a.correlation) > Math.abs(b.correlation) ? a : b
-    );
-    const weakestCorrelation = correlationStrengths.reduce((a, b) => 
-        Math.abs(a.correlation) < Math.abs(b.correlation) ? a : b
-    );
-    
-    // 性能テスト結果の解釈
-    const significantDifferences = [];
-    const nonSignificantDifferences = [];
-    
-    Object.entries(performanceTests).forEach(([comparison, data]) => {
-        if (data.significant) {
-            significantDifferences.push({ comparison, mae_diff: data.mae_difference });
-        } else {
-            nonSignificantDifferences.push({ comparison, mae_diff: data.mae_difference });
-        }
-    });
-    
-    // MAE値による性能ランキング
-    const modelPerformance = aggregatedData.length > 0 ? [
-        { name: 'Model A (Koheiduck)', mae: calculateMAE(aggregatedData, 'Model A (Koheiduck)_score', 'star_score') },
-        { name: 'Model B (LLM-book)', mae: calculateMAE(aggregatedData, 'Model B (LLM-book)_score', 'star_score') },
-        { name: 'Model C (Mizuiro)', mae: calculateMAE(aggregatedData, 'Model C (Mizuiro)_score', 'star_score') }
-    ].sort((a, b) => a.mae - b.mae) : [];
+
     
     // 解釈テキストの生成
     let interpretationHTML = `
         <div class="alert alert-info mb-4">
             <h6><i class="fas fa-info-circle me-2"></i>分析概要</h6>
-            <p class="mb-2">本分析では、${hospitalCount}件の獣医病院から収集された${totalReviews}件のレビューデータを用いて、
+            <p class="mb-2">本分析では、${hospitalCount}件の動物病院から収集された${totalReviews}件のレビューデータを用いて、
             3つの日本語BERT感情分析モデルの性能比較を実施しました。</p>
-            <p class="mb-0">平均評価: ${avgRating.toFixed(2)}点、分析対象期間のレビューを正規化星評価(-3〜+2)で評価しています。</p>
-        </div>
-        
-        <div class="row mb-4">
-            <div class="col-md-6">
-                <div class="card border-primary">
-                    <div class="card-header bg-primary text-white">
-                        <h6 class="mb-0"><i class="fas fa-trophy me-2"></i>モデル性能ランキング</h6>
-                    </div>
-                    <div class="card-body">
-    `;
-    
-    if (modelPerformance.length > 0) {
-        modelPerformance.forEach((model, index) => {
-            const rankIcon = index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉';
-            const performanceLevel = model.performance_level || (model.mae < 0.5 ? '優秀' : model.mae < 1.0 ? '良好' : model.mae < 1.5 ? '普通' : '要改善');
-            
-            interpretationHTML += `
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <span>${rankIcon} ${model.name.split('(')[1]?.replace(')', '') || model.name}</span>
-                            <span class="badge bg-secondary">MAE: ${model.mae.toFixed(4)} (${performanceLevel})</span>
-                        </div>
-            `;
-        });
-    } else {
-        interpretationHTML += '<p>性能データを計算中...</p>';
-    }
-    
-    interpretationHTML += `
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-6">
-                <div class="card border-success">
-                    <div class="card-header bg-success text-white">
-                        <h6 class="mb-0"><i class="fas fa-link me-2"></i>相関分析結果</h6>
-                    </div>
-                    <div class="card-body">
-    `;
-    
-    if (correlationStrengths.length > 0) {
-        interpretationHTML += `
-                        <div class="mb-3">
-                            <strong>最強相関:</strong> ${strongestCorrelation.model}<br>
-                            <span class="text-primary">r = ${strongestCorrelation.correlation.toFixed(4)} (${strongestCorrelation.strength})</span>
-                        </div>
-                        <div class="mb-2">
-                            <strong>最弱相関:</strong> ${weakestCorrelation.model}<br>
-                            <span class="text-secondary">r = ${weakestCorrelation.correlation.toFixed(4)} (${weakestCorrelation.strength})</span>
-                        </div>
-        `;
-    } else {
-        interpretationHTML += '<p>相関データを計算中...</p>';
-    }
-    
-    interpretationHTML += `
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="card border-warning mb-4">
-            <div class="card-header bg-warning text-dark">
-                <h6 class="mb-0"><i class="fas fa-chart-bar me-2"></i>統計的有意性検定</h6>
-            </div>
-            <div class="card-body">
-    `;
-    
-    if (significantDifferences.length > 0) {
-        interpretationHTML += `
-                <div class="alert alert-danger mb-3">
-                    <strong>有意な性能差が検出されました:</strong>
-                    <ul class="mb-0 mt-2">
-        `;
-        significantDifferences.forEach(diff => {
-            const [model1, model2] = diff.comparison.split('_vs_');
-            const betterModel = diff.mae_diff > 0 ? model2 : model1;
-            interpretationHTML += `<li>${model1} vs ${model2}: ${betterModel}が優位 (差分: ${Math.abs(diff.mae_diff).toFixed(4)})</li>`;
-        });
-        interpretationHTML += `
-                    </ul>
-                </div>
-        `;
-    }
-    
-    if (nonSignificantDifferences.length > 0) {
-        interpretationHTML += `
-                <div class="alert alert-success mb-3">
-                    <strong>統計的に有意でない比較:</strong> ${nonSignificantDifferences.length}件<br>
-                    <small>これらのモデル間では実質的な性能差は認められません。</small>
-                </div>
-        `;
-    }
-    
-    interpretationHTML += `
-            </div>
+            <p class="mb-2">平均評価: ${avgRating.toFixed(2)}点、分析対象期間のレビューを正規化星評価(-2〜+2)で評価しています。</p>
+            <p class="mb-0"><strong>統計手法:</strong> ブートストラップ法（リサンプリング10,000回）を用いた信頼区間推定と統計的検定を実施。</p>
         </div>
         
         <div class="card border-info">
@@ -1245,14 +1428,8 @@ function generateAnalysisInterpretation(results) {
                 <ul>
     `;
     
-    // 推奨事項の生成
-    if (modelPerformance.length > 0 && modelPerformance[0].mae < 1.0) {
-        interpretationHTML += modelRecommendation.recommended_model ? \n            `<li><strong>📊 システム推奨モデル:</strong> ${modelRecommendation.recommended_model} - ${modelRecommendation.recommendation_reason}</li>` :\n            `<li><strong>高精度分析:</strong> ${modelPerformance[0].name}は最も優秀な性能を示しており、重要な意思決定に推奨</li>`;
-    }
-    
-    if (strongestCorrelation && Math.abs(strongestCorrelation.correlation) > 0.7) {
-        interpretationHTML += `<li><strong>感情予測:</strong> ${strongestCorrelation.model}は星評価との強い相関を示し、顧客満足度予測に有効</li>`;
-    }
+    // 推奨事項の生成（削除された変数への参照を削除）
+    interpretationHTML += `<li><strong>📊 多モデル分析:</strong> 3つの日本語BERTモデルによる包括的な感情分析を実施</li>`;
     
     interpretationHTML += `
                     <li><strong>比較分析:</strong> 複数モデルの結果を組み合わせることで、より信頼性の高い分析が可能</li>
@@ -1329,7 +1506,12 @@ function parseCSV(csvText) {
         if (values.length === headers.length) {
             const row = {};
             headers.forEach((header, index) => {
-                row[header] = values[index];
+                let value = values[index];
+                // star_ratingを数値に変換
+                if (header === 'star_rating') {
+                    value = parseFloat(value) || 0;
+                }
+                row[header] = value;
             });
             data.push(row);
         }
@@ -1455,4 +1637,255 @@ function displayModelRecommendation(recommendationData) {
     
     html += '</div>';
     recContainer.innerHTML = html;
+}
+
+/**
+ * モデル性能比較表を表示する関数 (復活)
+ */
+function displayModelComparisonTable(modelData) {
+    const container = document.getElementById('modelComparisonTable');
+    if (!container) {
+        console.error('Model comparison table container not found');
+        return;
+    }
+    
+    console.log('📊 Displaying model comparison table with data:', modelData);
+    
+    // データが存在するかチェック
+    if (!modelData || typeof modelData !== 'object') {
+        console.error('No model comparison data available');
+        container.innerHTML = '<p class="text-muted">モデル比較データがありません</p>';
+        return;
+    }
+    
+    try {
+        // MAE結果を取得（複数のキーパターンに対応）
+        const maeResults = modelData.mae_results || modelData.MAE || modelData;
+        console.log('MAE results for table:', maeResults);
+        
+        if (!maeResults) {
+            container.innerHTML = '<p class="text-muted">MAE結果が見つかりません</p>';
+            return;
+        }
+        
+        let html = `
+            <div class="card mt-3">
+                <div class="card-header bg-primary text-white">
+                    <h6 class="mb-0"><i class="fas fa-table me-2"></i>モデル性能比較表（MAE値）</h6>
+                </div>
+                <div class="card-body p-0">
+                    <table class="table table-striped mb-0">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>モデル</th>
+                                <th>MAE値</th>
+                                <th>性能ランク</th>
+                                <th>評価</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+        `;
+        
+        // モデル名のマッピング
+        const modelNames = {
+            'cl-tohoku/bert-base-japanese-whole-word-masking': 'Koheiduck BERT',
+            'llm-book/bert-base-japanese-v3': 'LLM-book BERT',
+            'Mizuiro-sakura/luke-japanese-base-finetuned-vet': 'Mizuiro LUKE'
+        };
+        
+        // MAEデータを配列に変換してソート
+        const maeArray = [];
+        Object.entries(maeResults).forEach(([model, mae]) => {
+            maeArray.push({
+                model: model,
+                displayName: modelNames[model] || model,
+                mae: parseFloat(mae) || 0
+            });
+        });
+        
+        // MAE値でソート（小さい順 = 良い順）
+        maeArray.sort((a, b) => a.mae - b.mae);
+        
+        // テーブル行を生成
+        maeArray.forEach((item, index) => {
+            const rank = index + 1;
+            const rankBadge = rank === 1 ? '<span class="badge bg-warning text-dark">1位</span>' :
+                             rank === 2 ? '<span class="badge bg-secondary">2位</span>' :
+                             '<span class="badge bg-light text-dark">3位</span>';
+            
+            const evaluation = item.mae < 0.5 ? '優秀' : 
+                              item.mae < 1.0 ? '良好' : 
+                              item.mae < 1.5 ? '標準' : '要改善';
+            
+            const evaluationClass = item.mae < 0.5 ? 'text-success' : 
+                                   item.mae < 1.0 ? 'text-primary' : 
+                                   item.mae < 1.5 ? 'text-warning' : 'text-danger';
+            
+            html += `
+                <tr>
+                    <td><strong>${item.displayName}</strong></td>
+                    <td><code>${item.mae.toFixed(4)}</code></td>
+                    <td>${rankBadge}</td>
+                    <td><span class="${evaluationClass}">${evaluation}</span></td>
+                </tr>
+            `;
+        });
+        
+        html += `
+                        </tbody>
+                    </table>
+                </div>
+                <div class="card-footer text-muted small">
+                    <i class="fas fa-info-circle me-1"></i>
+                    MAE（平均絶対誤差）: 値が小さいほど高性能。実際の星評価との差の平均値を示します。
+                </div>
+            </div>
+        `;
+        
+        container.innerHTML = html;
+        console.log('✅ Model comparison table displayed successfully');
+        
+    } catch (error) {
+        console.error('❌ Error displaying model comparison table:', error);
+        container.innerHTML = `<div class="alert alert-danger">表示エラー: ${error.message}</div>`;
+    }
+}
+
+/**
+ * 星評価分布の円グラフを表示する関数 (復活)
+ */
+function displayStarRatingChart(starRatingData) {
+    const canvas = document.getElementById('starRatingChart');
+    if (!canvas) {
+        console.error('Star rating chart canvas not found');
+        return;
+    }
+    
+    console.log('⭐ Displaying star rating chart with data:', starRatingData);
+    
+    // データが存在するかチェック
+    if (!starRatingData || typeof starRatingData !== 'object') {
+        console.error('No star rating distribution data available');
+        return;
+    }
+    
+    try {
+        // Canvas直接描画で円グラフを作成
+        const ctx = canvas.getContext('2d');
+        
+        // Canvas サイズを設定
+        canvas.width = 400;
+        canvas.height = 400;
+        
+        // 背景をクリア
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // データを配列に変換
+        const data = [];
+        const labels = [];
+        const colors = ['#FF6384', '#FF9F40', '#FFCD56', '#4BC0C0', '#36A2EB'];
+        
+        // 1-5星の順序でデータを整理
+        for (let star = 1; star <= 5; star++) {
+            const count = starRatingData[star] || starRatingData[star.toString()] || 0;
+            data.push(count);
+            labels.push(`${star}つ星`);
+        }
+        
+        console.log('Star rating chart data:', { data, labels });
+        
+        // データが全て0の場合
+        const total = data.reduce((sum, val) => sum + val, 0);
+        if (total === 0) {
+            // 「データなし」を表示
+            ctx.fillStyle = '#6c757d';
+            ctx.font = '16px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('星評価データなし', canvas.width / 2, canvas.height / 2);
+            return;
+        }
+        
+        // 円グラフを描画
+        const centerX = canvas.width / 2;
+        const centerY = canvas.height / 2 - 30; // 凡例スペース確保
+        const radius = 120;
+        
+        let currentAngle = -Math.PI / 2; // 12時から開始
+        
+        data.forEach((value, index) => {
+            if (value > 0) {
+                const sliceAngle = (value / total) * 2 * Math.PI;
+                
+                // パイスライスを描画
+                ctx.beginPath();
+                ctx.moveTo(centerX, centerY);
+                ctx.arc(centerX, centerY, radius, currentAngle, currentAngle + sliceAngle);
+                ctx.closePath();
+                ctx.fillStyle = colors[index];
+                ctx.fill();
+                
+                // 境界線を描画
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                
+                // パーセンテージテキストを描画
+                const percentage = ((value / total) * 100).toFixed(1);
+                if (parseFloat(percentage) > 5) { // 5%以上の場合のみ表示
+                    const textAngle = currentAngle + sliceAngle / 2;
+                    const textX = centerX + Math.cos(textAngle) * (radius * 0.7);
+                    const textY = centerY + Math.sin(textAngle) * (radius * 0.7);
+                    
+                    ctx.fillStyle = '#fff';
+                    ctx.font = 'bold 12px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(`${percentage}%`, textX, textY);
+                }
+                
+                currentAngle += sliceAngle;
+            }
+        });
+        
+        // 凡例を描画
+        const legendY = centerY + radius + 40;
+        const legendItemWidth = canvas.width / labels.length;
+        
+        labels.forEach((label, index) => {
+            const count = data[index];
+            if (count > 0) {
+                const x = legendItemWidth * index + legendItemWidth / 2;
+                
+                // 色ボックス
+                ctx.fillStyle = colors[index];
+                ctx.fillRect(x - 40, legendY - 10, 15, 15);
+                
+                // テキスト
+                ctx.fillStyle = '#333';
+                ctx.font = '12px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText(`${label}`, x - 20, legendY + 5);
+                ctx.fillText(`(${count}件)`, x - 20, legendY + 18);
+            }
+        });
+        
+        // タイトルを描画
+        ctx.fillStyle = '#333';
+        ctx.font = 'bold 16px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('星評価分布', centerX, 25);
+        
+        console.log('✅ Star rating chart displayed successfully using Canvas');
+        
+    } catch (error) {
+        console.error('❌ Error displaying star rating chart:', error);
+        
+        // エラー時は代替メッセージを表示
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#dc3545';
+        ctx.font = '14px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('チャート表示エラー', canvas.width / 2, canvas.height / 2);
+        ctx.fillText(error.message, canvas.width / 2, canvas.height / 2 + 20);
+    }
 }

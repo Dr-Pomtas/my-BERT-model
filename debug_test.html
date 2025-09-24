@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>機能テストページ</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container mt-5">
+        <h1>動物病院口コミ分析システム - 機能テスト</h1>
+        
+        <!-- 1. Canvas円グラフテスト -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5>1. Canvas円グラフテスト</h5>
+            </div>
+            <div class="card-body">
+                <div id="testStarChart"></div>
+                <button class="btn btn-primary" onclick="testStarChart()">円グラフ表示テスト</button>
+            </div>
+        </div>
+        
+        <!-- 2. モデル性能比較表テスト -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5>2. モデル性能比較表テスト</h5>
+            </div>
+            <div class="card-body">
+                <div id="testModelChart"></div>
+                <button class="btn btn-success" onclick="testModelChart()">性能比較表示テスト</button>
+            </div>
+        </div>
+        
+        <!-- 3. 病院別分析テスト -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5>3. 病院別分析テスト</h5>
+            </div>
+            <div class="card-body">
+                <div id="testHospitalAnalysis"></div>
+                <button class="btn btn-warning" onclick="testHospitalAnalysis()">病院分析表示テスト</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 1. Canvas円グラフテスト
+        function testStarChart() {
+            const ctx = document.getElementById('testStarChart');
+            const starData = {'1': 100, '2': 150, '3': 300, '4': 800, '5': 650};
+            
+            const total = Object.values(starData).reduce((sum, count) => sum + count, 0);
+            
+            // Canvasを作成
+            ctx.innerHTML = '';
+            const canvas = document.createElement('canvas');
+            canvas.width = 400;
+            canvas.height = 400;
+            ctx.appendChild(canvas);
+            
+            // 簡単な円グラフを描画
+            const context = canvas.getContext('2d');
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            const radius = Math.min(centerX, centerY) - 20;
+            
+            const colors = ['#dc3545', '#fd7e14', '#ffc107', '#198754', '#20c997'];
+            let currentAngle = 0;
+            
+            context.clearRect(0, 0, canvas.width, canvas.height);
+            
+            ['1', '2', '3', '4', '5'].forEach((rating, index) => {
+                const count = starData[rating] || 0;
+                const angle = total > 0 ? (count / total) * 2 * Math.PI : 0;
+                
+                if (angle > 0) {
+                    // 円グラフのセクションを描画
+                    context.beginPath();
+                    context.arc(centerX, centerY, radius, currentAngle, currentAngle + angle);
+                    context.lineTo(centerX, centerY);
+                    context.fillStyle = colors[index];
+                    context.fill();
+                    context.strokeStyle = '#fff';
+                    context.lineWidth = 2;
+                    context.stroke();
+                    currentAngle += angle;
+                }
+            });
+            
+            // タイトルを追加
+            context.fillStyle = '#000';
+            context.font = '18px Arial';
+            context.textAlign = 'center';
+            context.fillText('星評価分布テスト', centerX, 30);
+            
+            // テーブルも追加
+            let tableHtml = `
+                <table class="table table-sm table-striped mt-3 mb-0">
+                    <thead>
+                        <tr><th>星評価</th><th>件数</th><th>割合</th></tr>
+                    </thead>
+                    <tbody>
+            `;
+            
+            ['1', '2', '3', '4', '5'].forEach((rating, index) => {
+                const count = starData[rating] || 0;
+                const percentage = total > 0 ? ((count / total) * 100).toFixed(1) : 0;
+                tableHtml += `<tr>
+                    <td><span style="color: ${colors[index]};">★${rating}</span></td>
+                    <td>${count}件</td>
+                    <td>${percentage}%</td>
+                </tr>`;
+            });
+            
+            tableHtml += '</tbody></table>';
+            const tableDiv = document.createElement('div');
+            tableDiv.innerHTML = tableHtml;
+            ctx.appendChild(tableDiv);
+        }
+        
+        // 2. モデル性能比較表テスト
+        function testModelChart() {
+            const ctx = document.getElementById('testModelChart');
+            const modelData = {
+                'Model A (Koheiduck)': { mae: 0.5542, correlation: 0.3416 },
+                'Model B (LLM-book)': { mae: 0.1835, correlation: 0.3897 },
+                'Model C (Mizuiro)': { mae: 0.7862, correlation: 0.3376 }
+            };
+            
+            const models = Object.keys(modelData);
+            let tableHtml = `
+                <div class="alert alert-info">
+                    <h6><i class="fas fa-chart-bar me-2"></i>モデル性能比較 (テーブル表示)</h6>
+                    <table class="table table-sm table-striped mt-2 mb-0">
+                        <thead>
+                            <tr><th>モデル</th><th>MAE</th><th>相関係数</th><th>性能</th></tr>
+                        </thead>
+                        <tbody>
+            `;
+            
+            // MAEでソート（昇順）
+            const sortedModels = models.sort((a, b) => (modelData[a].mae || 0) - (modelData[b].mae || 0));
+            
+            sortedModels.forEach((model, index) => {
+                const data = modelData[model];
+                const mae = data.mae || 0;
+                const correlation = data.correlation || 0;
+                const rank = index + 1;
+                const rankIcon = rank === 1 ? '🥇' : rank === 2 ? '🥈' : '🥉';
+                
+                tableHtml += `<tr>
+                    <td><strong>${model}</strong></td>
+                    <td>${mae.toFixed(4)}</td>
+                    <td>${correlation.toFixed(3)}</td>
+                    <td>${rankIcon} ${rank}位</td>
+                </tr>`;
+            });
+            
+            tableHtml += '</tbody></table></div>';
+            ctx.innerHTML = tableHtml;
+        }
+        
+        // 3. 病院別分析テスト
+        function testHospitalAnalysis() {
+            const ctx = document.getElementById('testHospitalAnalysis');
+            const hospitalData = {
+                'H001': {
+                    'review_count': 40,
+                    'avg_rating': 3.6,
+                    'avg_sentiment': 0.145,
+                    'Model A (Koheiduck)_score': 0.234,
+                    'Model B (LLM-book)_score': 0.156,
+                    'Model C (Mizuiro)_score': 0.045
+                },
+                'H002': {
+                    'review_count': 35,
+                    'avg_rating': 4.2,
+                    'avg_sentiment': 0.287,
+                    'Model A (Koheiduck)_score': 0.345,
+                    'Model B (LLM-book)_score': 0.289,
+                    'Model C (Mizuiro)_score': 0.227
+                }
+            };
+            
+            let html = `
+                <div class="card">
+                    <div class="card-header">
+                        <h6 class="mb-0"><i class="fas fa-hospital me-2"></i>病院別分析結果</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover">
+                                <thead class="table-dark">
+                                    <tr>
+                                        <th>病院ID</th>
+                                        <th>レビュー数</th>
+                                        <th>平均星評価</th>
+                                        <th>Koheiduck</th>
+                                        <th>LLM-book</th>
+                                        <th>Mizuiro</th>
+                                        <th>平均感情スコア</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+            `;
+            
+            Object.entries(hospitalData).forEach(([hospitalId, data]) => {
+                const avgRating = data.avg_rating || 0;
+                const koheiduck = data['Model A (Koheiduck)_score'] || 0;
+                const llmbook = data['Model B (LLM-book)_score'] || 0;
+                const mizuiro = data['Model C (Mizuiro)_score'] || 0;
+                
+                html += `
+                    <tr>
+                        <td><strong>${hospitalId}</strong></td>
+                        <td>${data.review_count}件</td>
+                        <td>${avgRating.toFixed(2)}点</td>
+                        <td><span class="badge bg-primary">${koheiduck.toFixed(3)}</span></td>
+                        <td><span class="badge bg-success">${llmbook.toFixed(3)}</span></td>
+                        <td><span class="badge bg-warning">${mizuiro.toFixed(3)}</span></td>
+                        <td><strong>${data.avg_sentiment.toFixed(3)}</strong></td>
+                    </tr>
+                `;
+            });
+            
+            html += `
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            ctx.innerHTML = html;
+        }
+    </script>
+</body>
+</html>

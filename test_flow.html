@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Analysis Flow</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; line-height: 1.6; }
+        .step { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        button { margin: 5px; padding: 8px 16px; }
+        .result { background: #f8f9fa; padding: 10px; margin: 10px 0; border-radius: 3px; }
+        .error { background: #ffebee; color: #c62828; }
+        .success { background: #e8f5e8; color: #2e7d32; }
+    </style>
+</head>
+<body>
+    <h1>Test Analysis Flow</h1>
+    
+    <div class="step">
+        <h3>Step 1: Load Sample Data</h3>
+        <button id="loadSampleBtn">Load Sample Data</button>
+        <div id="step1Result" class="result"></div>
+    </div>
+    
+    <div class="step">
+        <h3>Step 2: Run Analysis</h3>
+        <button id="runAnalysisBtn" disabled>Run Analysis</button>
+        <div id="step2Result" class="result"></div>
+    </div>
+    
+    <div class="step">
+        <h3>Step 3: Test Charts (Canvas fallback)</h3>
+        <button id="testChartsBtn" disabled>Test Charts</button>
+        <div id="step3Result" class="result"></div>
+        <div id="chartContainers" style="display: none;">
+            <div>
+                <h4>Star Rating Chart:</h4>
+                <div id="starRatingChart"></div>
+            </div>
+            <div>
+                <h4>Model Comparison Chart:</h4>
+                <div id="modelChart"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let uploadedData = null;
+        let analysisResults = null;
+
+        // Step 1: Load Sample Data
+        document.getElementById('loadSampleBtn').addEventListener('click', function() {
+            const resultDiv = document.getElementById('step1Result');
+            resultDiv.innerHTML = 'Loading sample data...';
+            
+            fetch('/load_sample_data')
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Sample data response:', data);
+                    if (data.success) {
+                        uploadedData = data.data;
+                        resultDiv.innerHTML = `<div class="success">✅ Sample data loaded: ${uploadedData.length} reviews</div>`;
+                        document.getElementById('runAnalysisBtn').disabled = false;
+                    } else {
+                        resultDiv.innerHTML = `<div class="error">❌ Error: ${data.error}</div>`;
+                    }
+                })
+                .catch(error => {
+                    console.error('Load sample data error:', error);
+                    resultDiv.innerHTML = `<div class="error">❌ Network error: ${error.message}</div>`;
+                });
+        });
+
+        // Step 2: Run Analysis
+        document.getElementById('runAnalysisBtn').addEventListener('click', function() {
+            const resultDiv = document.getElementById('step2Result');
+            resultDiv.innerHTML = 'Running analysis...';
+            
+            fetch('/analyze', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ data: uploadedData })
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Analysis response:', data);
+                if (data.success) {
+                    analysisResults = data.results;
+                    resultDiv.innerHTML = `<div class="success">✅ Analysis completed</div>`;
+                    document.getElementById('testChartsBtn').disabled = false;
+                    
+                    // Display some key results
+                    const details = `
+                        <h5>Analysis Results:</h5>
+                        <ul>
+                            <li>Basic stats: ${analysisResults.basic_stats ? 'Available' : 'Missing'}</li>
+                            <li>Star distribution: ${analysisResults.star_rating_distribution ? 'Available' : 'Missing'}</li>
+                            <li>Model comparison: ${analysisResults.model_comparison ? 'Available' : 'Missing'}</li>
+                            <li>Hospital analysis: ${analysisResults.hospital_analysis ? 'Available' : 'Missing'}</li>
+                        </ul>
+                    `;
+                    resultDiv.innerHTML += details;
+                } else {
+                    resultDiv.innerHTML = `<div class="error">❌ Analysis error: ${data.error}</div>`;
+                }
+            })
+            .catch(error => {
+                console.error('Analysis error:', error);
+                resultDiv.innerHTML = `<div class="error">❌ Network error: ${error.message}</div>`;
+            });
+        });
+
+        // Step 3: Test Charts
+        document.getElementById('testChartsBtn').addEventListener('click', function() {
+            const resultDiv = document.getElementById('step3Result');
+            const chartContainers = document.getElementById('chartContainers');
+            
+            if (!analysisResults) {
+                resultDiv.innerHTML = '<div class="error">❌ No analysis results available</div>';
+                return;
+            }
+
+            resultDiv.innerHTML = 'Creating charts...';
+            chartContainers.style.display = 'block';
+
+            try {
+                // Test star rating chart (Canvas fallback)
+                if (analysisResults.star_rating_distribution) {
+                    createStarRatingChart(analysisResults.star_rating_distribution);
+                    resultDiv.innerHTML = '<div class="success">✅ Star rating chart created</div>';
+                }
+
+                // Test model comparison chart (Canvas fallback)
+                if (analysisResults.model_comparison) {
+                    createModelComparisonChart(analysisResults.model_comparison);
+                    resultDiv.innerHTML += '<div class="success">✅ Model comparison chart created</div>';
+                }
+
+                // Test hospital analysis
+                if (analysisResults.hospital_analysis) {
+                    resultDiv.innerHTML += '<div class="success">✅ Hospital analysis data available</div>';
+                    console.log('Hospital analysis sample:', Object.keys(analysisResults.hospital_analysis)[0], analysisResults.hospital_analysis[Object.keys(analysisResults.hospital_analysis)[0]]);
+                }
+
+            } catch (error) {
+                console.error('Chart creation error:', error);
+                resultDiv.innerHTML = `<div class="error">❌ Chart error: ${error.message}</div>`;
+            }
+        });
+
+        // Canvas Star Rating Chart (same as working test)
+        function createStarRatingChart(starData) {
+            const container = document.getElementById('starRatingChart');
+            container.innerHTML = '';
+            
+            const canvas = document.createElement('canvas');
+            canvas.width = 400;
+            canvas.height = 400;
+            canvas.style.border = '1px solid #ddd';
+            container.appendChild(canvas);
+            
+            const ctx = canvas.getContext('2d');
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            const radius = Math.min(centerX, centerY) - 60;
+            
+            const colors = ['#dc3545', '#fd7e14', '#ffc107', '#198754', '#20c997'];
+            const total = Object.values(starData).reduce((sum, count) => sum + count, 0);
+            let currentAngle = -Math.PI / 2;
+            
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            ['1', '2', '3', '4', '5'].forEach((rating, index) => {
+                const count = starData[rating] || 0;
+                const angle = total > 0 ? (count / total) * 2 * Math.PI : 0;
+                
+                if (angle > 0) {
+                    ctx.beginPath();
+                    ctx.arc(centerX, centerY, radius, currentAngle, currentAngle + angle);
+                    ctx.lineTo(centerX, centerY);
+                    ctx.fillStyle = colors[index];
+                    ctx.fill();
+                    ctx.strokeStyle = '#fff';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                    
+                    const labelAngle = currentAngle + angle / 2;
+                    const labelX = centerX + Math.cos(labelAngle) * (radius * 0.7);
+                    const labelY = centerY + Math.sin(labelAngle) * (radius * 0.7);
+                    
+                    ctx.fillStyle = '#fff';
+                    ctx.font = 'bold 12px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(`★${rating}`, labelX, labelY);
+                    ctx.fillText(`${count}`, labelX, labelY + 15);
+                    
+                    currentAngle += angle;
+                }
+            });
+            
+            ctx.fillStyle = '#333';
+            ctx.font = 'bold 18px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('星評価分布', centerX, 35);
+        }
+
+        // Model Comparison Chart (Table fallback)
+        function createModelComparisonChart(modelData) {
+            const container = document.getElementById('modelChart');
+            const models = Object.keys(modelData);
+            const sortedModels = models.sort((a, b) => (modelData[a].mae || 0) - (modelData[b].mae || 0));
+            
+            let html = `
+                <table style="width: 100%; border-collapse: collapse; border: 1px solid #ddd;">
+                    <thead>
+                        <tr style="background: #f8f9fa;">
+                            <th style="border: 1px solid #ddd; padding: 8px;">Rank</th>
+                            <th style="border: 1px solid #ddd; padding: 8px;">Model</th>
+                            <th style="border: 1px solid #ddd; padding: 8px;">MAE</th>
+                            <th style="border: 1px solid #ddd; padding: 8px;">Correlation</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+            
+            sortedModels.forEach((model, index) => {
+                const mae = modelData[model].mae || 0;
+                const correlation = modelData[model].correlation || 0;
+                const rank = index + 1;
+                const rankIcon = rank === 1 ? '🥇' : rank === 2 ? '🥈' : '🥉';
+                
+                html += `
+                    <tr>
+                        <td style="border: 1px solid #ddd; padding: 8px;">${rankIcon} ${rank}</td>
+                        <td style="border: 1px solid #ddd; padding: 8px;"><strong>${model}</strong></td>
+                        <td style="border: 1px solid #ddd; padding: 8px;">${mae.toFixed(4)}</td>
+                        <td style="border: 1px solid #ddd; padding: 8px;">${correlation.toFixed(3)}</td>
+                    </tr>
+                `;
+            });
+            
+            html += '</tbody></table>';
+            container.innerHTML = html;
+        }
+    </script>
+</body>
+</html>

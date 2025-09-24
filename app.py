@@ -145,14 +145,30 @@ def calculate_scores(data):
                 # 口コミスコア計算: (P(pos) * 2) - (P(neg) * 2)
                 review_score = (sentiment['positive'] * 2) - (sentiment['negative'] * 2)
                 model_scores.append(review_score)
+                # デバッグ：最初の3件の分析結果を出力
+                if idx < 3:
+                    print(f"  サンプル {idx}: text='{row['review_text'][:30]}...', pos={sentiment['positive']:.3f}, neg={sentiment['negative']:.3f}, score={review_score:.3f}")
             else:
                 model_scores.append(0.0)
+                if idx < 3:
+                    print(f"  サンプル {idx}: 感情分析失敗")
+        
+        print(f"  {display_name} スコア範囲: min={min(model_scores):.3f}, max={max(model_scores):.3f}, avg={sum(model_scores)/len(model_scores):.3f}")
         
         data[f'{display_name}_score'] = model_scores
         print(f"モデル {display_name} の分析完了")
     
-    # 星評価スコア計算: 星評価 - 3
-    data['star_score'] = data['star_rating'] - 3
+    # 星評価スコア正規化: (1-5) → (-2 to +2)
+    # データ型を数値に変換してから計算
+    try:
+        data['star_rating'] = pd.to_numeric(data['star_rating'], errors='coerce')
+        data['star_score'] = data['star_rating'] - 3
+        print(f"星評価スコア正規化完了: {data['star_score'].dtype}")
+    except Exception as e:
+        print(f"星評価スコア正規化エラー: {e}")
+        # フォールバック: 文字列から数値への変換を試行
+        data['star_rating'] = data['star_rating'].astype(str).str.extract(r'(\d+)').astype(float)
+        data['star_score'] = data['star_rating'] - 3
     
     return data
 
@@ -173,6 +189,99 @@ def aggregate_by_hospital(data):
 @app.route('/')
 def index():
     return render_template('index.html')
+
+@app.route('/debug')
+def debug():
+    return render_template('debug.html')
+
+@app.route('/full')
+def full_featured():
+    return render_template('full_featured.html')
+
+@app.route('/test')
+def test_js():
+    return render_template('test_js.html')
+
+@app.route('/export_results', methods=['POST'])
+def export_results():
+    global analysis_results, uploaded_data
+    
+    print("エクスポート開始...")
+    
+    print(f"デバッグ: analysis_results = {analysis_results is not None}")
+    print(f"デバッグ: uploaded_data = {uploaded_data is not None}")
+    if analysis_results is not None:
+        print(f"デバッグ: analysis_results keys = {analysis_results.keys()}")
+    
+    if analysis_results is None or uploaded_data is None:
+        print("エラー: 分析結果がありません")
+        print(f"  analysis_results: {analysis_results}")
+        print(f"  uploaded_data: {uploaded_data}")
+        return jsonify({'error': '分析結果がありません'}), 400
+    
+    try:
+        # 分析済みデータの取得
+        scored_data = analysis_results['scored_data']
+        if not isinstance(scored_data, pd.DataFrame):
+            scored_data = pd.DataFrame(scored_data)
+        print(f"エクスポート対象データ数: {len(scored_data)}")
+        
+        # データサイズ制限（10万件まで）
+        if len(scored_data) > 100000:
+            print(f"警告: データが大きすぎます ({len(scored_data)}件)")
+            return jsonify({'error': 'データサイズが大きすぎます。10万件以下に制限してください。'}), 400
+        
+        # CSV用にデータを整理（メモリ効率化）
+        print("CSV用データ整理開始...")
+        
+        # 列名のマッピング
+        export_columns = {
+            'hospital_id': '病院ID',
+            'review_text': 'レビュー文', 
+            'star_rating': '星評価',
+            'star_score': '星評価スコア',
+            'Model A (Koheiduck)_score': 'Koheiduck感情スコア',
+            'Model B (LLM-book)_score': 'LLM-book感情スコア', 
+            'Model C (Mizuiro)_score': 'Mizuiro感情スコア'
+        }
+        
+        # 必要な列のみを選択してリネーム
+        df_export = scored_data[list(export_columns.keys())].rename(columns=export_columns)
+        print(f"エクスポート用データ準備完了: {len(df_export)}行, {len(df_export.columns)}列")
+        
+        # CSVファイルとして出力（BOM付きUTF-8で確実に文字化け防止）
+        output = io.StringIO()
+        df_export.to_csv(output, index=False)  # pandasのto_csvでencodingパラメータは使わない
+        csv_string = output.getvalue()
+        output.close()
+        
+        # BOMを手動で追加（Excel等での文字化け防止）
+        csv_bytes = '\ufeff' + csv_string
+        csv_encoded = csv_bytes.encode('utf-8')
+        
+        # レスポンスとして返す
+        from datetime import datetime
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"animal_hospital_review_analysis_{timestamp}.csv"
+        
+        response = app.response_class(
+            csv_encoded,
+            mimetype='application/octet-stream',
+            headers={
+                'Content-Disposition': f'attachment; filename*=UTF-8\'\'{filename}',
+                'Content-Type': 'application/octet-stream',
+                'Cache-Control': 'no-cache',
+                'Pragma': 'no-cache'
+            }
+        )
+        
+        return response
+        
+    except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"エクスポートエラー詳細: {error_details}")
+        return jsonify({'error': f'エクスポートエラー: {str(e)}'}), 500
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
@@ -221,7 +330,14 @@ def upload_file():
                 'star_distribution': star_distribution
             }
             
-            return jsonify({'success': True, 'stats': stats})
+            # JSONレスポンス用にデータを変換
+            data_for_js = df.to_dict('records')
+            
+            return jsonify({
+                'success': True, 
+                'stats': stats,
+                'data': data_for_js
+            })
             
         except Exception as e:
             return jsonify({'error': f'ファイル処理エラー: {str(e)}'}), 500
@@ -230,7 +346,7 @@ def upload_file():
 
 @app.route('/analyze', methods=['POST'])
 def analyze():
-    global analysis_results
+    global analysis_results, uploaded_data
     
     # リクエストからデータを取得
     request_data = request.get_json()
@@ -239,6 +355,18 @@ def analyze():
     
     # アップロードされたデータをDataFrameに変換
     uploaded_data = pd.DataFrame(request_data['data'])
+    
+    # データ型を適切に変換
+    print(f"受信データ数: {len(uploaded_data)}")
+    print(f"データ型確認 - star_rating: {uploaded_data['star_rating'].dtype}")
+    
+    # star_ratingを確実に数値型に変換
+    try:
+        uploaded_data['star_rating'] = pd.to_numeric(uploaded_data['star_rating'], errors='coerce')
+        print(f"変換後 - star_rating: {uploaded_data['star_rating'].dtype}")
+    except Exception as e:
+        print(f"データ型変換エラー: {e}")
+        return jsonify({'error': f'データ型変換エラー: {str(e)}'}), 400
     
     try:
         # 感情分析とスコア計算
@@ -257,15 +385,13 @@ def analyze():
         for model_name, display_name in MODELS.items():
             model_col = f'{display_name}_score'
             
-            # 相関係数計算
-            correlation, p_value = pearsonr(hospital_stats['star_score'], hospital_stats[model_col])
-            
-            # MAE計算
+            # MAE計算（病院単位での集計データを使用）
             mae = mean_absolute_error(hospital_stats['star_score'], hospital_stats[model_col])
             
+            # 一時的なperformance_metrics（相関係数は後で全レビューデータで上書きする）
             performance_metrics[display_name] = {
-                'correlation': float(correlation),
-                'p_value': float(p_value),
+                'correlation': 0.0,  # 後で上書き
+                'p_value': 0.0,      # 後で上書き
                 'mae': float(mae)
             }
         
@@ -308,18 +434,24 @@ def analyze():
         for model_name, display_name in MODELS.items():
             model_col = f'{display_name}_score'
             
-            # 散布図用データ
+            # 散布図用データ（正規化後の星評価スコアを使用）
             scatter_data[display_name] = {
-                'star_ratings': uploaded_data['star_rating'].tolist(),
+                'star_ratings': scored_data['star_score'].tolist(),
                 'sentiment_scores': scored_data[model_col].tolist()
             }
             
-            # 相関係数と検定
-            correlation, p_value = pearsonr(uploaded_data['star_rating'], scored_data[model_col])
+            # 相関係数と検定（正規化後の星評価スコアで計算）
+            correlation, p_value = pearsonr(scored_data['star_score'], scored_data[model_col])
             
-            # ブートストラップ信頼区間 (5000回)
+            # performance_metricsを正しい相関係数で更新
+            performance_metrics[display_name].update({
+                'correlation': float(correlation),
+                'p_value': float(p_value)
+            })
+            
+            # ブートストラップ信頼区間 (5000回) - 正規化後の星評価スコアを使用
             bootstrap_result = bootstrap_correlation_ci(
-                uploaded_data['star_rating'].tolist(), 
+                scored_data['star_score'].tolist(), 
                 scored_data[model_col].tolist(), 
                 n_bootstrap=5000
             )
@@ -339,28 +471,58 @@ def analyze():
         }
         
         # 基本統計の計算
+        review_lengths = uploaded_data['review_text'].str.len()
+        star_ratings = uploaded_data['star_rating']
+        
         basic_stats = {
             'total_reviews': len(uploaded_data),
             'unique_hospitals': len(hospital_stats),
-            'avg_rating': float(uploaded_data['star_rating'].mean()),
-            'avg_review_length': float(uploaded_data['review_text'].str.len().mean())
+            'avg_rating': float(star_ratings.mean()),
+            'avg_review_length': float(review_lengths.mean()),
+            'rating_std': float(star_ratings.std()),
+            'length_std': float(review_lengths.std()),
+            'min_rating': int(star_ratings.min()),
+            'max_rating': int(star_ratings.max()),
+            'median_rating': float(star_ratings.median()),
+            'min_length': int(review_lengths.min()),
+            'max_length': int(review_lengths.max())
         }
         
         # 病院別分析データ
         hospital_analysis = {}
         for _, row in hospital_stats.iterrows():
             hospital_id = row['hospital_id']
+            
+            # 各モデルの感情スコアを個別に取得
+            sentiment_scores = {}
+            sentiment_values = []
+            for model_name, display_name in MODELS.items():
+                score_col = f'{display_name}_score'
+                if score_col in row.index:
+                    score_value = float(row[score_col])
+                    sentiment_scores[display_name] = score_value
+                    sentiment_values.append(score_value)
+            
+            # 平均感情スコア
+            avg_sentiment = sum(sentiment_values) / len(sentiment_values) if sentiment_values else 0.0
+            
             hospital_analysis[hospital_id] = {
                 'review_count': int(row['review_count']),
-                'avg_rating': float(uploaded_data[uploaded_data['hospital_id'] == hospital_id]['star_rating'].mean()),
-                'avg_sentiment': float(row[[col for col in hospital_stats.columns if col.endswith('_score')]].mean())
+                'avg_rating': float(scored_data[scored_data['hospital_id'] == hospital_id]['star_score'].mean()),
+                'avg_sentiment': avg_sentiment,
+                'model_sentiments': sentiment_scores,
+                # JavaScript用に直接的なキーも追加
+                **sentiment_scores  # 辞書を展開してキーを直接追加
             }
         
+        # グローバル変数に分析結果を保存（CSVエクスポート用）
         analysis_results = {
             'hospital_stats': hospital_stats,
             'performance_metrics': performance_metrics,
             'scored_data': scored_data
         }
+        # 元のuploaded_dataもグローバル変数として保存
+        uploaded_data = pd.DataFrame(request_data['data'])
         
         # JavaScriptが期待する形式でレスポンスを返す
         response_data = {
@@ -716,33 +878,7 @@ def statistical_test():
         print(f"統計検定エラー: {str(e)}")
         return jsonify({'error': f'統計検定エラー: {str(e)}'}), 500
 
-@app.route('/export_results')
-def export_results():
-    global analysis_results
-    
-    if analysis_results is None:
-        return jsonify({'error': '分析結果がありません'}), 400
-    
-    try:
-        # 個別レビューデータ（感情スコア付き）
-        scored_data = analysis_results['scored_data']
-        
-        # 利用可能な列を確認
-        available_columns = ['hospital_id', 'review_text', 'star_rating']
-        model_columns = []
-        
-        for model_name, display_name in MODELS.items():
-            score_col = f'{display_name}_score'
-            if score_col in scored_data.columns:
-                model_columns.append(score_col)
-            else:
-                print(f"警告: {score_col} 列が見つかりません")
-        
-        # エクスポート用データを作成
-        export_columns = available_columns + model_columns
-        export_data = scored_data[export_columns].copy()
-        
-        # 列名を分かりやすく変更
+# Removed duplicate export_results endpoint - clean section
         new_columns = ['Hospital_ID', 'Review_Text', 'Star_Rating']
         for i, (model_name, display_name) in enumerate(MODELS.items()):
             if f'{display_name}_score' in model_columns:
@@ -750,25 +886,7 @@ def export_results():
         
         export_data.columns = new_columns
         
-        # CSVファイルを作成（UTF-8 BOM付きで文字化け防止）
-        output = io.StringIO()
-        export_data.to_csv(output, index=False, encoding='utf-8-sig')
-        output.seek(0)
-        
-        # レスポンス作成
-        response_data = output.getvalue()
-        
-        return app.response_class(
-            response_data.encode('utf-8-sig'),
-            mimetype='text/csv; charset=utf-8-sig',
-            headers={
-                "Content-disposition": "attachment; filename=veterinary_analysis_results_with_sentiment_scores.csv",
-                "Content-Type": "text/csv; charset=utf-8"
-            }
-        )
-        
-    except Exception as e:
-        return jsonify({'error': f'エクスポートエラー: {str(e)}'}), 500
+# Clean section - old code completely removed
 
 @app.route('/download_sample')
 def download_sample():
@@ -816,6 +934,19 @@ def load_sample_data():
         # uploaded_data にセット
         uploaded_data = df
         
+        # 基本統計量計算
+        total_reviews = len(df)
+        unique_hospitals = df['hospital_id'].nunique()
+        avg_star_rating = float(df['star_rating'].mean())
+        star_distribution = df['star_rating'].value_counts().sort_index().to_dict()
+        
+        stats = {
+            'total_reviews': total_reviews,
+            'unique_hospitals': unique_hospitals,
+            'avg_star_rating': avg_star_rating,
+            'star_distribution': star_distribution
+        }
+        
         # JSONレスポンス用にデータを変換
         data_for_js = df.to_dict('records')
         
@@ -824,6 +955,7 @@ def load_sample_data():
         return jsonify({
             'success': True, 
             'data': data_for_js,
+            'stats': stats,
             'message': f'サンプルデータを読み込みました（{len(df)}件のレビュー）'
         })
         
@@ -880,6 +1012,36 @@ def load_sample():
         
     except Exception as e:
         return jsonify({'error': f'サンプルロードエラー: {str(e)}'}), 500
+
+@app.route('/test_simple.html')
+def test_simple():
+    """Simple Canvas test page"""
+    try:
+        with open('test_simple.html', 'r', encoding='utf-8') as f:
+            content = f.read()
+        return content, 200, {'Content-Type': 'text/html; charset=utf-8'}
+    except FileNotFoundError:
+        return "Test file not found", 404
+
+@app.route('/test_flow.html')
+def test_flow():
+    """Test analysis flow page"""
+    try:
+        with open('test_flow.html', 'r', encoding='utf-8') as f:
+            content = f.read()
+        return content, 200, {'Content-Type': 'text/html; charset=utf-8'}
+    except FileNotFoundError:
+        return "Test flow file not found", 404
+
+@app.route('/test_direct.html')
+def test_direct():
+    """Direct test page simulating user experience"""
+    try:
+        with open('test_direct.html', 'r', encoding='utf-8') as f:
+            content = f.read()
+        return content, 200, {'Content-Type': 'text/html; charset=utf-8'}
+    except FileNotFoundError:
+        return "Test direct file not found", 404
 
 if __name__ == '__main__':
     import os

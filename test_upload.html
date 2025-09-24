@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Upload Test</title>
+</head>
+<body>
+    <h1>Upload Test</h1>
+    <input type="file" id="fileInput" accept=".csv">
+    <div id="result"></div>
+    
+    <script>
+        console.log('Test script loaded');
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            console.log('File selected:', e.target.files[0]);
+            document.getElementById('result').innerHTML = 'File selected: ' + e.target.files[0].name;
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Direct Test - User Experience</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; line-height: 1.6; }
+        button { margin: 10px; padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
+        .step { margin: 20px 0; padding: 20px; border: 2px solid #ddd; border-radius: 10px; }
+        .result { margin: 15px 0; padding: 15px; border-radius: 5px; }
+        .error { background: #ffebee; color: #c62828; border: 1px solid #ef9a9a; }
+        .success { background: #e8f5e8; color: #2e7d32; border: 1px solid #81c784; }
+        .info { background: #e3f2fd; color: #1565c0; border: 1px solid #64b5f6; }
+        .chart-container { margin: 20px 0; padding: 20px; border: 2px dashed #ddd; }
+        table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background: #f5f5f5; }
+    </style>
+</head>
+<body>
+    <h1>直接テスト - ユーザー体験シミュレーション</h1>
+    <p>この页面では、実際の分析フローを模倣してテストします。</p>
+
+    <div class="step">
+        <h2>ステップ 1: サンプルデータ読み込み</h2>
+        <button id="step1Btn">サンプルデータを使用</button>
+        <div id="step1Result" class="result"></div>
+    </div>
+
+    <div class="step">
+        <h2>ステップ 2: 感情分析実行</h2>
+        <button id="step2Btn" disabled>分析実行</button>
+        <div id="step2Result" class="result"></div>
+    </div>
+
+    <div class="step">
+        <h2>ステップ 3: チャート表示確認</h2>
+        <button id="step3Btn" disabled>チャート表示テスト</button>
+        <div id="step3Result" class="result"></div>
+        
+        <div class="chart-container">
+            <h3>星評価円グラフ (Canvas)</h3>
+            <div id="starChart"></div>
+        </div>
+        
+        <div class="chart-container">
+            <h3>モデル性能比較表</h3>
+            <div id="modelTable"></div>
+        </div>
+        
+        <div class="chart-container">
+            <h3>病院別分析</h3>
+            <div id="hospitalTable"></div>
+        </div>
+    </div>
+
+    <div class="step">
+        <h2>ステップ 4: CSV エクスポート</h2>
+        <button id="step4Btn" disabled>CSVエクスポート</button>
+        <div id="step4Result" class="result"></div>
+    </div>
+
+    <script>
+        let uploadedData = null;
+        let analysisResults = null;
+
+        // ステップ 1: サンプルデータ読み込み
+        document.getElementById('step1Btn').addEventListener('click', function() {
+            const btn = this;
+            const result = document.getElementById('step1Result');
+            
+            btn.disabled = true;
+            result.innerHTML = '<div class="info">サンプルデータを読み込み中...</div>';
+            
+            fetch('/load_sample_data')
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Step 1 - Sample data response:', data);
+                    
+                    if (data.success) {
+                        uploadedData = data.data;
+                        result.innerHTML = `
+                            <div class="success">
+                                ✅ サンプルデータ読み込み成功<br>
+                                - レビュー数: ${uploadedData.length}件<br>
+                                - 病院数: ${data.stats.unique_hospitals}件<br>
+                                - 平均星評価: ${data.stats.avg_star_rating.toFixed(2)}点
+                            </div>
+                        `;
+                        document.getElementById('step2Btn').disabled = false;
+                    } else {
+                        result.innerHTML = `<div class="error">❌ エラー: ${data.error}</div>`;
+                    }
+                })
+                .catch(error => {
+                    console.error('Step 1 error:', error);
+                    result.innerHTML = `<div class="error">❌ ネットワークエラー: ${error.message}</div>`;
+                })
+                .finally(() => {
+                    btn.disabled = false;
+                });
+        });
+
+        // ステップ 2: 分析実行
+        document.getElementById('step2Btn').addEventListener('click', function() {
+            const btn = this;
+            const result = document.getElementById('step2Result');
+            
+            btn.disabled = true;
+            result.innerHTML = '<div class="info">感情分析を実行中... (数秒かかります)</div>';
+            
+            fetch('/analyze', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ data: uploadedData })
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Step 2 - Analysis response:', data);
+                
+                if (data.success) {
+                    analysisResults = data.results;
+                    result.innerHTML = `
+                        <div class="success">
+                            ✅ 分析実行成功<br>
+                            - 基本統計: ${analysisResults.basic_stats ? '✓' : '✗'}<br>
+                            - モデル比較: ${analysisResults.model_comparison ? '✓' : '✗'}<br>
+                            - 星評価分布: ${analysisResults.star_rating_distribution ? '✓' : '✗'}<br>
+                            - 病院別分析: ${analysisResults.hospital_analysis ? '✓' : '✗'}
+                        </div>
+                    `;
+                    document.getElementById('step3Btn').disabled = false;
+                    document.getElementById('step4Btn').disabled = false;
+                } else {
+                    result.innerHTML = `<div class="error">❌ 分析エラー: ${data.error}</div>`;
+                }
+            })
+            .catch(error => {
+                console.error('Step 2 error:', error);
+                result.innerHTML = `<div class="error">❌ ネットワークエラー: ${error.message}</div>`;
+            })
+            .finally(() => {
+                btn.disabled = false;
+            });
+        });
+
+        // ステップ 3: チャート表示
+        document.getElementById('step3Btn').addEventListener('click', function() {
+            const result = document.getElementById('step3Result');
+            
+            if (!analysisResults) {
+                result.innerHTML = '<div class="error">❌ 分析結果がありません</div>';
+                return;
+            }
+
+            try {
+                result.innerHTML = '<div class="info">チャートを生成中...</div>';
+
+                // 1. 星評価円グラフ
+                if (analysisResults.star_rating_distribution) {
+                    createStarChart(analysisResults.star_rating_distribution);
+                    result.innerHTML = '<div class="success">✅ 星評価円グラフ作成完了</div>';
+                }
+
+                // 2. モデル性能比較表  
+                if (analysisResults.model_comparison) {
+                    createModelTable(analysisResults.model_comparison);
+                    result.innerHTML += '<div class="success">✅ モデル性能比較表作成完了</div>';
+                }
+
+                // 3. 病院別分析表
+                if (analysisResults.hospital_analysis) {
+                    createHospitalTable(analysisResults.hospital_analysis);
+                    result.innerHTML += '<div class="success">✅ 病院別分析表作成完了</div>';
+                }
+
+            } catch (error) {
+                console.error('Chart creation error:', error);
+                result.innerHTML = `<div class="error">❌ チャート生成エラー: ${error.message}</div>`;
+            }
+        });
+
+        // ステップ 4: CSV エクスポート
+        document.getElementById('step4Btn').addEventListener('click', function() {
+            const result = document.getElementById('step4Result');
+            
+            result.innerHTML = '<div class="info">CSVファイルを準備中...</div>';
+            
+            fetch('/export_results', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({})
+            })
+            .then(response => {
+                if (response.ok) {
+                    return response.blob();
+                } else {
+                    return response.json().then(data => {
+                        throw new Error(data.error || `HTTP ${response.status}`);
+                    });
+                }
+            })
+            .then(blob => {
+                // ダウンロード実行
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `analysis_${new Date().toISOString().slice(0,10)}.csv`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                
+                result.innerHTML = '<div class="success">✅ CSVエクスポート成功</div>';
+            })
+            .catch(error => {
+                console.error('Export error:', error);
+                result.innerHTML = `<div class="error">❌ エクスポートエラー: ${error.message}</div>`;
+            });
+        });
+
+        // チャート作成関数
+        function createStarChart(starData) {
+            const container = document.getElementById('starChart');
+            container.innerHTML = '';
+            
+            const canvas = document.createElement('canvas');
+            canvas.width = 300;
+            canvas.height = 300;
+            canvas.style.border = '1px solid #ddd';
+            container.appendChild(canvas);
+            
+            const ctx = canvas.getContext('2d');
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            const radius = Math.min(centerX, centerY) - 40;
+            
+            const colors = ['#dc3545', '#fd7e14', '#ffc107', '#198754', '#20c997'];
+            const total = Object.values(starData).reduce((sum, count) => sum + count, 0);
+            
+            let currentAngle = -Math.PI / 2;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            ['1', '2', '3', '4', '5'].forEach((rating, index) => {
+                const count = starData[rating] || 0;
+                const angle = total > 0 ? (count / total) * 2 * Math.PI : 0;
+                
+                if (angle > 0) {
+                    ctx.beginPath();
+                    ctx.arc(centerX, centerY, radius, currentAngle, currentAngle + angle);
+                    ctx.lineTo(centerX, centerY);
+                    ctx.fillStyle = colors[index];
+                    ctx.fill();
+                    ctx.strokeStyle = '#fff';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                    currentAngle += angle;
+                }
+            });
+            
+            ctx.fillStyle = '#333';
+            ctx.font = 'bold 16px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('星評価分布', centerX, 25);
+        }
+
+        function createModelTable(modelData) {
+            const container = document.getElementById('modelTable');
+            const models = Object.keys(modelData);
+            const sortedModels = models.sort((a, b) => (modelData[a].mae || 0) - (modelData[b].mae || 0));
+            
+            let html = `
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ランク</th>
+                            <th>モデル名</th>
+                            <th>MAE</th>
+                            <th>相関係数</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+            
+            sortedModels.forEach((model, index) => {
+                const mae = modelData[model].mae || 0;
+                const correlation = modelData[model].correlation || 0;
+                const rank = index + 1;
+                const rankIcon = rank === 1 ? '🥇' : rank === 2 ? '🥈' : '🥉';
+                
+                html += `
+                    <tr>
+                        <td>${rankIcon} ${rank}位</td>
+                        <td><strong>${model}</strong></td>
+                        <td>${mae.toFixed(4)}</td>
+                        <td>${correlation.toFixed(3)}</td>
+                    </tr>
+                `;
+            });
+            
+            html += '</tbody></table>';
+            container.innerHTML = html;
+        }
+
+        function createHospitalTable(hospitalData) {
+            const container = document.getElementById('hospitalTable');
+            const hospitalIds = Object.keys(hospitalData).slice(0, 5); // 最初の5病院のみ表示
+            
+            let html = `
+                <p><strong>病院別分析 (最初の5病院)</strong></p>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>病院ID</th>
+                            <th>レビュー数</th>
+                            <th>平均星評価</th>
+                            <th>Koheiduck</th>
+                            <th>LLM-book</th>
+                            <th>Mizuiro</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+            
+            hospitalIds.forEach(hospitalId => {
+                const data = hospitalData[hospitalId];
+                console.log(`Hospital ${hospitalId} data:`, data);
+                
+                // モデルスコアを安全に取得
+                const koheiduck = data['Model A (Koheiduck)_score'] || data.koheiduck_score || 0;
+                const llmbook = data['Model B (LLM-book)_score'] || data.llmbook_score || 0;
+                const mizuiro = data['Model C (Mizuiro)_score'] || data.mizuiro_score || 0;
+                
+                html += `
+                    <tr>
+                        <td><strong>${hospitalId}</strong></td>
+                        <td>${data.review_count || 0}件</td>
+                        <td>${(data.avg_star_rating || data.avg_rating || 0).toFixed(2)}点</td>
+                        <td>${koheiduck.toFixed(3)}</td>
+                        <td>${llmbook.toFixed(3)}</td>
+                        <td>${mizuiro.toFixed(3)}</td>
+                    </tr>
+                `;
+            });
+            
+            html += '</tbody></table>';
+            container.innerHTML = html;
+        }
+    </script>
+</body>
+</html>
